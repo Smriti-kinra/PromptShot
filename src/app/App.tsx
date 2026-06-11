@@ -5,175 +5,9 @@ import type { Challenge } from "../lib/supabase";
 import { calculateAndUpdateStreak } from "../lib/streak";
 import { LearnPanel } from "./components/LearnPanel";
 import { Topbar } from "./components/Topbar";
-
-// ─── localStorage keys ────────────────────────────────────────────────────────
-
-const LS_DIFFICULTY = "promptshot_difficulty";
-const LS_HISTORY = "promptshot_history";
-const LS_STREAK = "promptshot_streak";
-const LS_LAST_PLAYED = "promptshot_last_played";
-
-interface LocalScore {
-  played_at: string;
-  accuracy: number;
-  format: number;
-  brevity: number;
-  total: number;
-  challenge_id?: string;
-  user_prompt?: string;
-}
-
-function getLocalHistory(): LocalScore[] {
-  try {
-    return JSON.parse(localStorage.getItem(LS_HISTORY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalScore(entry: LocalScore) {
-  const history = getLocalHistory();
-  history.push(entry);
-  localStorage.setItem(LS_HISTORY, JSON.stringify(history));
-}
-
-function calculateLocalStreak(): number {
-  const history = getLocalHistory();
-  if (!history.length) return 1;
-
-  const today = new Date().toISOString().split("T")[0];
-  const dates = [...new Set(history.map((s) => s.played_at))].sort().reverse();
-
-  let streak = 0;
-  let expected = today;
-
-  for (const date of dates) {
-    if (date === expected) {
-      streak++;
-      const d = new Date(expected);
-      d.setDate(d.getDate() - 1);
-      expected = d.toISOString().split("T")[0];
-    } else {
-      break;
-    }
-  }
-
-  localStorage.setItem(LS_STREAK, String(streak));
-  localStorage.setItem(LS_LAST_PLAYED, today);
-  return streak;
-}
-
-async function migrateLocalScoresToSupabase(userId: string) {
-  const history = getLocalHistory();
-  if (!history.length) return;
-
-  const rows = history.map((s) => ({
-    user_id: userId,
-    challenge_id: s.challenge_id ?? null,
-    accuracy: s.accuracy,
-    format: s.format,
-    brevity: s.brevity,
-    total: s.total,
-    user_prompt: s.user_prompt ?? "",
-    played_at: s.played_at,
-  }));
-
-  await supabase.from("scores").upsert(rows, { onConflict: "user_id,played_at" });
-
-  localStorage.removeItem(LS_HISTORY);
-  localStorage.removeItem(LS_STREAK);
-  localStorage.removeItem(LS_LAST_PLAYED);
-}
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-const EDGE_URL =
-  "https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2/score";
-
-function getDayOfYear(d: Date): number {
-  const start = new Date(d.getFullYear(), 0, 0);
-  return Math.floor((d.getTime() - start.getTime()) / 86400000);
-}
-
-async function loadChallenge(difficulty: string): Promise<Challenge | null> {
-  const dayOfYear = getDayOfYear(new Date());
-  const { data } = await supabase
-    .from("challenges")
-    .select("*")
-    .eq("difficulty", difficulty)
-    .eq("active", true)
-    .order("id");
-  if (!data || data.length === 0) return null;
-  return data[dayOfYear % data.length];
-}
-
-async function scorePrompt(
-  userPrompt: string,
-  challenge: Challenge,
-  session: Session,
-): Promise<ScoreResult> {
-  const res = await fetch(EDGE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify({
-      userPrompt,
-      targetOutput: challenge.target_output,
-      idealPrompt: challenge.ideal_prompt,
-    }),
-  });
-  if (!res.ok) throw new Error(`Score request failed: ${res.status}`);
-  const data = await res.json();
-  return { accuracy: data.accuracy, format: data.format, brevity: data.brevity, total: data.total };
-}
-
-function mockScore(userPrompt: string): ScoreResult {
-  const len = userPrompt.length;
-  const brevity = len < 80 ? 85 : len < 150 ? 65 : 45;
-  const hasStructure = /\b(write|create|generate|explain|list|describe)\b/i.test(userPrompt);
-  const hasDetails = userPrompt.split(/[.,;]/).length > 1;
-  const accuracy = Math.round(
-    hasStructure && hasDetails ? 75 + Math.random() * 20 : 55 + Math.random() * 20,
-  );
-  const format = Math.round(hasStructure ? 70 + Math.random() * 25 : 50 + Math.random() * 20);
-  return { accuracy, format, brevity, total: accuracy + format + brevity };
-}
-
-const GUEST_SCORE_URL =
-  "https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2/score-guest";
-
-async function simulateScore(
-  userPrompt: string,
-  targetOutput: string,
-  idealPrompt: string,
-): Promise<ScoreResult> {
-  const [res] = await Promise.all([
-    fetch(GUEST_SCORE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userPrompt, targetOutput, idealPrompt }),
-    }).then((r) => r.json()).catch(() => null),
-    new Promise((resolve) => setTimeout(resolve, 1400)),
-  ]);
-
-  if (res && typeof res.accuracy === "number") {
-    return { accuracy: res.accuracy, format: res.format, brevity: res.brevity, total: res.total };
-  }
-  return mockScore(userPrompt);
-}
-
-// ─── types ────────────────────────────────────────────────────────────────────
-
-type GameState = "loading-challenge" | "challenge" | "scoring" | "results" | "already-played";
-
-interface ScoreResult {
-  accuracy: number;
-  format: number;
-  brevity: number;
-  total: number;
-}
+import { useGameState } from "../hooks/useGameState";
+import { scorePrompt, simulateScore, mockScore } from "../lib/scorer";
+import type { ScoreResult } from "../lib/scorer";
 
 // ─── hooks ────────────────────────────────────────────────────────────────────
 
@@ -352,24 +186,51 @@ function AlreadyPlayed({
   );
 }
 
+// ─── main helper ──────────────────────────────────────────────────────────────
+
+function getDayOfYear(d: Date): number {
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d.getTime() - start.getTime()) / 86400000);
+}
+
+async function loadChallenge(difficulty: string, selectFields: string): Promise<Challenge | null> {
+  const dayOfYear = getDayOfYear(new Date());
+  const { data } = await supabase
+    .from("challenges")
+    .select(selectFields)
+    .eq("difficulty", difficulty)
+    .eq("active", true)
+    .order("id");
+  if (!data || data.length === 0) return null;
+  return data[dayOfYear % data.length];
+}
+
 // ─── main component ───────────────────────────────────────────────────────────
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
 
-  const [gameState, setGameState] = useState<GameState>("loading-challenge");
+  const {
+    gameState,
+    setGameState,
+    streak,
+    setStreak,
+    getLocalHistory,
+    saveLocalScore,
+    calculateLocalStreak,
+    migrateLocalScoresToSupabase,
+  } = useGameState();
+
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [difficulty, setDifficulty] = useState<string>(
-    () => localStorage.getItem(LS_DIFFICULTY) ?? "BEGINNER",
+    () => localStorage.getItem("promptshot_difficulty") ?? "BEGINNER",
   );
 
   const [userPrompt, setUserPrompt] = useState("");
   const [score, setScore] = useState<ScoreResult | null>(null);
-  const [streak, setStreak] = useState(0);
+  const [idealPrompt, setIdealPrompt] = useState("");
   const [showAutoIdeal, setShowAutoIdeal] = useState(false);
-  const [showImpactCard, setShowImpactCard] = useState(false);
-  const [targetExpanded, setTargetExpanded] = useState(true);
   const [animateScore, setAnimateScore] = useState(false);
   const [showLearnPanel, setShowLearnPanel] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -393,21 +254,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(LS_DIFFICULTY, difficulty);
+    localStorage.setItem("promptshot_difficulty", difficulty);
   }, [difficulty]);
 
   useEffect(() => {
     if (sessionLoading) return;
-    setGameState("loading-challenge");
+    setChallenge(null);
     setScore(null);
+    setIdealPrompt("");
     setShowAutoIdeal(false);
-    setShowImpactCard(false);
     setAnimateScore(false);
-    setTargetExpanded(true);
     setUserPrompt("");
 
     (async () => {
       const today = new Date().toISOString().split("T")[0];
+      let hasPlayed = false;
 
       if (session) {
         const { data: profile } = await supabase
@@ -416,11 +277,26 @@ export default function App() {
           .eq("id", session.user.id)
           .single();
         setStreak(profile?.streak ?? 0);
+
+        const { data: existing } = await supabase
+          .from("scores")
+          .select("id")
+          .eq("user_id", session.user.id)
+          .eq("played_at", today)
+          .maybeSingle();
+        if (existing) hasPlayed = true;
       } else {
-        setStreak(parseInt(localStorage.getItem(LS_STREAK) ?? "0", 10));
+        setStreak(parseInt(localStorage.getItem("promptshot_streak") ?? "0", 10));
+        const todayEntry = getLocalHistory().find((s) => s.played_at === today);
+        if (todayEntry) hasPlayed = true;
       }
 
-      const ch = await loadChallenge(difficulty);
+      // Secure retrieval: fetch ideal_prompt only if they have already played today
+      const selectFields = hasPlayed
+        ? "id, category, difficulty, target_output, ideal_prompt, char_count, active"
+        : "id, category, difficulty, target_output, char_count, active";
+
+      const ch = await loadChallenge(difficulty, selectFields);
       setChallenge(ch);
 
       if (!ch) {
@@ -428,20 +304,26 @@ export default function App() {
         return;
       }
 
+      if (ch.ideal_prompt) {
+        setIdealPrompt(ch.ideal_prompt);
+      }
+
       if (session) {
-        const { data: existing } = await supabase
+        const { data: existingScore } = await supabase
           .from("scores")
           .select("*")
           .eq("user_id", session.user.id)
           .eq("played_at", today)
           .single();
 
-        if (existing) {
+        if (existingScore) {
           setScore({
-            accuracy: existing.accuracy,
-            format: existing.format,
-            brevity: existing.brevity,
-            total: existing.total,
+            accuracy: existingScore.accuracy,
+            format: existingScore.format,
+            brevity: existingScore.brevity,
+            total: existingScore.total,
+            waterMl: existingScore.water_ml ?? 10,
+            co2Grams: existingScore.co2_grams ?? 0.1,
           });
           setGameState("already-played");
         } else {
@@ -455,6 +337,8 @@ export default function App() {
             format: todayEntry.format,
             brevity: todayEntry.brevity,
             total: todayEntry.total,
+            waterMl: todayEntry.waterMl ?? 10,
+            co2Grams: todayEntry.co2Grams ?? 0.1,
           });
           setGameState("already-played");
         } else {
@@ -470,13 +354,17 @@ export default function App() {
 
   const handleSubmit = async () => {
     if (!userPrompt.trim() || !challenge) return;
-    setGameState("scoring");
+    setGameState("loading");
 
     let result: ScoreResult;
 
     if (session) {
       try {
-        result = await scorePrompt(userPrompt, challenge, session);
+        result = await scorePrompt(
+          userPrompt,
+          challenge.id,
+          session.access_token
+        );
       } catch (err) {
         console.error("Scoring error, using local fallback:", err);
         result = mockScore(userPrompt);
@@ -492,12 +380,14 @@ export default function App() {
         total: result.total,
         user_prompt: userPrompt,
         played_at: today,
+        water_ml: result.waterMl,
+        co2_grams: result.co2Grams,
       });
 
       const newStreak = await calculateAndUpdateStreak(session.user.id);
       setStreak(newStreak);
     } else {
-      result = await simulateScore(userPrompt, challenge.target_output, challenge.ideal_prompt);
+      result = await simulateScore(userPrompt, challenge.id);
 
       const today = new Date().toISOString().split("T")[0];
       saveLocalScore({
@@ -508,6 +398,8 @@ export default function App() {
         total: result.total,
         challenge_id: challenge.id,
         user_prompt: userPrompt,
+        waterMl: result.waterMl,
+        co2Grams: result.co2Grams,
       });
 
       const newStreak = calculateLocalStreak();
@@ -515,10 +407,17 @@ export default function App() {
     }
 
     setScore(result);
+    if (result.idealPrompt) {
+      setIdealPrompt(result.idealPrompt);
+    }
     setGameState("results");
-    setTargetExpanded(false);
     setTimeout(() => setAnimateScore(true), 100);
-    setTimeout(() => setShowImpactCard(true), 1600);
+    
+    // Automatically transition results -> impact after 2000ms
+    setTimeout(() => {
+      setGameState("impact");
+    }, 2000);
+
     if (result.total < 210) {
       setTimeout(() => setShowAutoIdeal(true), 1500);
     }
@@ -587,15 +486,17 @@ export default function App() {
     );
   }
 
+  const isChallengeLoading = !challenge;
+
   return (
     <>
       {topbar}
       <div style={contentStyle}>
         <div style={{ maxWidth: "500px", margin: "0 auto" }}>
 
-          {gameState === "loading-challenge" && <LoadingSkeleton />}
+          {isChallengeLoading && <LoadingSkeleton />}
 
-          {challenge && gameState !== "loading-challenge" && (
+          {challenge && (
             <div style={{ background: "var(--ps-surface)", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
               <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
                 <span style={{ background: "var(--ps-teal)", color: "#000", padding: "4px 12px", borderRadius: "9999px", fontSize: "var(--ps-text-caption)", fontWeight: 600 }}>
@@ -610,35 +511,26 @@ export default function App() {
               </div>
               <div
                 style={{
-                  maxHeight: targetExpanded ? "240px" : "60px",
+                  maxHeight: "240px",
                   overflow: "auto",
                   background: "#0A0A0A",
                   padding: "16px",
                   borderRadius: "8px",
                   marginBottom: "8px",
-                  fontFamily: challenge.category === "CODE" ? "monospace" : "Inter",
+                  fontFamily: challenge.category === "CODE" ? "var(--ps-font-mono)" : "Space Grotesk",
                   fontSize: "var(--ps-text-secondary-size)",
                   lineHeight: "1.6",
-                  transition: "max-height 0.3s ease",
                 }}
               >
                 {challenge.target_output}
               </div>
-              {gameState === "results" && !targetExpanded && (
-                <button
-                  onClick={() => setTargetExpanded(true)}
-                  style={{ background: "transparent", border: "none", color: "var(--ps-amber)", fontSize: "var(--ps-text-caption)", cursor: "pointer", padding: 0, marginBottom: "8px" }}
-                >
-                  show more
-                </button>
-              )}
               <div style={{ color: "var(--ps-text-secondary)", fontSize: "var(--ps-text-caption)" }}>
                 {challenge.char_count} characters
               </div>
             </div>
           )}
 
-          {gameState === "challenge" && (
+          {gameState === "challenge" && challenge && (
             <>
               <div style={{ color: "var(--ps-text-secondary)", fontSize: "var(--ps-text-secondary-size)", marginBottom: "8px" }}>
                 Write the prompt that generates this:
@@ -656,7 +548,7 @@ export default function App() {
                   padding: "16px",
                   color: "var(--ps-text-primary)",
                   fontSize: "var(--ps-text-body)",
-                  fontFamily: "Inter, sans-serif",
+                  fontFamily: "var(--ps-font-mono)",
                   resize: "vertical",
                   marginBottom: "8px",
                   boxSizing: "border-box",
@@ -691,7 +583,7 @@ export default function App() {
             </>
           )}
 
-          {gameState === "scoring" && (
+          {gameState === "loading" && (
             <div style={{ textAlign: "center", padding: "40px 0" }}>
               <div
                 style={{
@@ -711,7 +603,7 @@ export default function App() {
             </div>
           )}
 
-          {gameState === "results" && score && (
+          {(gameState === "results" || gameState === "impact") && score && (
             <>
               <div style={{ textAlign: "center", marginBottom: "32px" }}>
                 <svg width="200" height="200" viewBox="0 0 200 200" style={{ margin: "0 auto" }}>
@@ -762,14 +654,14 @@ export default function App() {
                 ))}
               </div>
 
-              {showImpactCard && (
+              {gameState === "impact" && (
                 <div style={{ background: "var(--ps-surface)", borderLeft: "4px solid var(--ps-teal)", padding: "24px", borderRadius: "8px", marginBottom: "24px", animation: "slideUp 0.6s ease-out forwards" }}>
                   <style>{`@keyframes slideUp { from { opacity:0; transform:translateY(40px); } to { opacity:1; transform:translateY(0); } }`}</style>
                   <div style={{ marginBottom: "8px", fontSize: "var(--ps-text-secondary-size)" }}>
                     This prompt used <span style={{ color: "var(--ps-teal)", fontWeight: 600 }}>1</span> API call
                   </div>
                   <div style={{ marginBottom: score.total < 180 ? "16px" : "0", fontSize: "var(--ps-text-secondary-size)", color: "var(--ps-text-secondary)" }}>
-                    ≈ <span style={{ color: "var(--ps-teal)" }}>10ml</span> water · ≈ <span style={{ color: "var(--ps-teal)" }}>0.1g</span> CO₂
+                    ≈ <span style={{ color: "var(--ps-teal)" }}>{score.waterMl}ml</span> water · ≈ <span style={{ color: "var(--ps-teal)" }}>{score.co2Grams}g</span> CO₂
                   </div>
                   {score.total < 180 && (
                     <>
@@ -787,7 +679,7 @@ export default function App() {
                 </div>
               )}
 
-              {showAutoIdeal && challenge && (
+              {showAutoIdeal && idealPrompt && (
                 <div style={{ marginBottom: "24px", animation: "slideUp 0.4s ease-out" }}>
                   <div style={{ fontSize: "14px", color: "#888880", marginBottom: "12px" }}>
                     Here's what a strong prompt looks like
@@ -798,13 +690,13 @@ export default function App() {
                       borderLeft: "4px solid #14B8A6",
                       borderRadius: "8px",
                       padding: "16px",
-                      fontFamily: "monospace",
+                      fontFamily: "var(--ps-font-mono)",
                       fontSize: "14px",
                       color: "#F0EFE8",
                       lineHeight: "1.6",
                     }}
                   >
-                    {challenge.ideal_prompt}
+                    {idealPrompt}
                   </div>
                 </div>
               )}
