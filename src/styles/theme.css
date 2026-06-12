@@ -248,3 +248,118 @@
   opacity: 1;
   transform: translateX(-50%) translateY(-4px);
 }
+
+/* Upgraded SVG Target and Bow/Arrow Animation Keyframes */
+@keyframes arrow-shoot {
+  0% {
+    transform: translate(-80px, 240px) rotate(-45deg);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(-80px, 240px) rotate(-45deg);
+    opacity: 1;
+  }
+  20% {
+    /* Draw back (pull back arrow) */
+    transform: translate(-92px, 252px) rotate(-45deg);
+    opacity: 1;
+  }
+  24% {
+    /* Release and fly rapidly towards target */
+    transform: translate(75px, 85px) rotate(-45deg);
+    opacity: 1;
+  }
+  25% {
+    /* Hit center (80, 80) */
+    transform: translate(80px, 80px) rotate(-45deg);
+    opacity: 1;
+  }
+  27% {
+    /* Wobble impact phase 1 */
+    transform: translate(80px, 80px) rotate(-48deg);
+    opacity: 1;
+  }
+  30% {
+    /* Wobble impact phase 2 */
+    transform: translate(80px, 80px) rotate(-42deg);
+    opacity: 1;
+  }
+  33% {
+    /* Wobble impact phase 3 */
+    transform: translate(80px, 80px) rotate(-46deg);
+    opacity: 1;
+  }
+  36% {
+    /* Wobble impact phase 4 */
+    transform: translate(80px, 80px) rotate(-44deg);
+    opacity: 1;
+  }
+  40% {
+    /* Settle at center */
+    transform: translate(80px, 80px) rotate(-45deg);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(80px, 80px) rotate(-45deg);
+    opacity: 1;
+  }
+  85% {
+    /* Fade out */
+    transform: translate(80px, 80px) rotate(-45deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-80px, 240px) rotate(-45deg);
+    opacity: 0;
+  }
+}
+
+@keyframes target-wobble {
+  0%, 24% {
+    transform: scale(1);
+  }
+  25% {
+    /* Hit bounce */
+    transform: scale(1.12);
+  }
+  28% {
+    /* rebound scale down */
+    transform: scale(0.92);
+  }
+  32% {
+    /* settle bounce 1 */
+    transform: scale(1.04);
+  }
+  36% {
+    /* settle bounce 2 */
+    transform: scale(0.98);
+  }
+  40% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ripple-expand {
+  0%, 24% {
+    r: 14px;
+    opacity: 0;
+    stroke-width: 3px;
+  }
+  25% {
+    r: 14px;
+    opacity: 1;
+    stroke-width: 3px;
+  }
+  60% {
+    r: 72px;
+    opacity: 0;
+    stroke-width: 0.5px;
+  }
+  100% {
+    r: 72px;
+    opacity: 0;
+  }
+}

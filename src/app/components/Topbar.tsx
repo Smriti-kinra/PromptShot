@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "../../lib/supabase";
 
 const C = {
   bg: "#0B1610",
@@ -17,7 +16,7 @@ const C = {
   mono: "'JetBrains Mono', monospace",
 };
 
-// ── slide panel ───────────────────────────────────────────────────────────────
+// ── slide panel (used by the nav menu) ────────────────────────────────────────
 
 function SlidePanel({
   open,
@@ -100,17 +99,14 @@ function SlidePanel({
   );
 }
 
-// ── settings / hamburger sidebar (right) ──────────────────────────────────────
+// ── nav menu (left) — PromptShot 101 + play/sandbox links ─────────────────────
 
-function SettingsSidebar({
+function NavMenu({
   open,
   onClose,
   session,
   streak,
-  difficulty,
-  onDifficultyChange,
   onOpenLearn,
-  onBackToMenu,
   hasPlayedToday,
   onStartPlay,
   onPlaySandbox,
@@ -119,71 +115,38 @@ function SettingsSidebar({
   onClose: () => void;
   session: Session | null;
   streak: number;
-  difficulty: string;
-  onDifficultyChange: (d: string) => void;
   onOpenLearn: () => void;
-  onBackToMenu?: () => void;
   hasPlayedToday?: boolean;
   onStartPlay?: () => void;
   onPlaySandbox?: () => void;
 }) {
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    background: "#0B1610",
-    border: `1px solid ${C.border}`,
-    borderRadius: "8px",
-    padding: "12px 14px",
-    color: C.primary,
-    fontSize: "14px",
-    fontFamily: C.font,
-    boxSizing: "border-box",
-    outline: "none",
-  };
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setInfo(null);
-    if (authMode === "signup" && password !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    setAuthLoading(true);
-    if (authMode === "signin") {
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-      if (err) setError(err.message);
-      else onClose();
-    } else {
-      const { error: err } = await supabase.auth.signUp({ email, password });
-      if (err) setError(err.message);
-      else setInfo("Check your email to confirm your account.");
-    }
-    setAuthLoading(false);
-  };
-
   return (
-    <SlidePanel open={open} onClose={onClose} from="right" width={300}>
+    <SlidePanel open={open} onClose={onClose} from="left" width={300}>
+      {/* Header row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
-        <div style={{ fontSize: "16px", fontWeight: 600, color: C.primary }}>Settings</div>
+        <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+          <span style={{ fontFamily: C.font, fontSize: "16px", fontWeight: 850, color: C.primary, letterSpacing: "-0.04em" }}>Prompt</span>
+          <span style={{ fontFamily: C.font, fontSize: "16px", fontWeight: 300, fontStyle: "italic", color: C.mint, paddingRight: "2px", letterSpacing: "-0.03em" }}>Shot</span>
+          <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.amber, marginRight: "4px", alignSelf: "center", marginTop: "2px" }} />
+        </div>
         <button
           onClick={onClose}
-          style={{ background: "none", border: "none", color: C.secondary, fontSize: "24px", cursor: "pointer", lineHeight: 1, padding: "4px" }}
+          style={{ background: "none", border: "none", color: C.secondary, fontSize: "22px", cursor: "pointer", lineHeight: 1, padding: "4px" }}
         >
           ×
         </button>
       </div>
 
-      <div style={{ marginBottom: "24px" }}>
+      {/* User info */}
+      <div style={{ marginBottom: "20px" }}>
         <div style={{ fontSize: "12px", color: C.secondary, fontFamily: C.mono, marginBottom: "4px" }}>
-          {session ? session.user.email : "Guest"}
+          {session ? (
+            <span>
+              {(session.user.user_metadata?.display_name as string | undefined) ?? session.user.email}
+            </span>
+          ) : (
+            "Playing as guest"
+          )}
         </div>
         {streak > 0 && (
           <div style={{ fontSize: "20px", fontWeight: 700, color: C.primary }}>
@@ -192,47 +155,30 @@ function SettingsSidebar({
         )}
       </div>
 
-      <div style={{ height: "1px", background: C.divider, marginBottom: "24px" }} />
+      <div style={{ height: "1px", background: C.divider, marginBottom: "20px" }} />
 
-      <div style={{ marginBottom: "24px" }}>
-        <div style={{ fontSize: "11px", color: C.secondary, marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: C.mono }}>
-          Difficulty
-        </div>
-        <div style={{ display: "flex", gap: "6px" }}>
-          {(["BEGINNER", "PRO", "EXPERT"] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => onDifficultyChange(d)}
-              style={{
-                flex: 1,
-                height: "34px",
-                background: difficulty === d ? C.mint : "transparent",
-                color: difficulty === d ? "#0B1610" : C.secondary,
-                border: `1px solid ${difficulty === d ? C.mint : C.border}`,
-                borderRadius: "20px",
-                fontSize: "10px",
-                fontWeight: 700,
-                cursor: "pointer",
-                transition: "all 0.15s",
-                fontFamily: C.font,
-                letterSpacing: "0.05em",
-              }}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ height: "1px", background: C.divider, marginBottom: "24px" }} />
-
+      {/* PromptShot 101 link */}
       <button
         onClick={() => { onClose(); onOpenLearn(); }}
-        style={{ background: "none", border: "none", color: C.primary, fontSize: "14px", cursor: "pointer", padding: "10px 0", display: "block", width: "100%", textAlign: "left", fontFamily: C.font }}
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "10px 0",
+          display: "flex",
+          alignItems: "center",
+          width: "100%",
+          textAlign: "left",
+        }}
       >
-        Prompt Engineering 101 ›
+        <span style={{ fontFamily: C.font, fontSize: "14px", fontWeight: 850, color: "var(--ps-text-primary)", letterSpacing: "-0.04em" }}>Prompt</span>
+        <span style={{ fontFamily: C.font, fontSize: "14px", fontWeight: 300, fontStyle: "italic", color: "var(--ps-teal)", paddingRight: "2px", letterSpacing: "-0.03em" }}>Shot</span>
+        <span style={{ width: "3px", height: "3px", borderRadius: "50%", background: "var(--ps-amber)", marginRight: "5px", alignSelf: "center", marginTop: "3px" }} />
+        <span style={{ fontFamily: C.font, fontSize: "14px", fontWeight: 700, color: "var(--ps-text-primary)", marginRight: "4px" }}>101</span>
+        <span style={{ fontFamily: C.font, fontSize: "14px", color: "var(--ps-text-secondary)" }}>›</span>
       </button>
 
+      {/* Play / Sandbox link */}
       {hasPlayedToday ? (
         onPlaySandbox && (
           <button
@@ -252,62 +198,6 @@ function SettingsSidebar({
           </button>
         )
       )}
-
-      {onBackToMenu && (
-        <button
-          onClick={() => { onClose(); onBackToMenu(); }}
-          style={{ background: "none", border: "none", color: C.primary, fontSize: "14px", cursor: "pointer", padding: "10px 0", display: "block", width: "100%", textAlign: "left", fontFamily: C.font }}
-        >
-          Back to Home Menu ›
-        </button>
-      )}
-
-      <div style={{ height: "1px", background: C.divider, marginBottom: "24px", marginTop: "8px" }} />
-
-      {session ? (
-        <button
-          onClick={() => { supabase.auth.signOut(); onClose(); }}
-          style={{
-            width: "100%", height: "42px", background: "transparent",
-            border: `1px solid ${C.border}`, color: C.primary, borderRadius: "8px",
-            fontSize: "14px", cursor: "pointer", fontFamily: C.font,
-          }}
-        >
-          Sign out
-        </button>
-      ) : (
-        <>
-          <div style={{ fontSize: "13px", fontWeight: 600, color: C.primary, marginBottom: "14px", fontFamily: C.font }}>
-            {authMode === "signin" ? "Sign in to save progress" : "Create account"}
-          </div>
-          <form onSubmit={handleAuth} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required style={inputStyle} />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required style={inputStyle} />
-            {authMode === "signup" && (
-              <input type="password" placeholder="Confirm password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required style={inputStyle} />
-            )}
-            <button
-              type="submit"
-              disabled={authLoading}
-              style={{
-                width: "100%", height: "42px", background: C.mint, color: "#0B1610",
-                border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: 700,
-                cursor: authLoading ? "not-allowed" : "pointer", marginTop: "4px", fontFamily: C.font,
-              }}
-            >
-              {authLoading ? "…" : authMode === "signin" ? "Sign in" : "Create account"}
-            </button>
-          </form>
-          {error && <div style={{ color: C.red, fontSize: "12px", marginTop: "8px", fontFamily: C.mono }}>{error}</div>}
-          {info && <div style={{ color: C.mint, fontSize: "12px", marginTop: "8px", fontFamily: C.mono }}>{info}</div>}
-          <button
-            onClick={() => { setAuthMode(authMode === "signin" ? "signup" : "signin"); setError(null); setInfo(null); }}
-            style={{ background: "none", border: "none", color: C.secondary, fontSize: "12px", cursor: "pointer", padding: 0, marginTop: "14px", display: "block", fontFamily: C.font }}
-          >
-            {authMode === "signin" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-          </button>
-        </>
-      )}
     </SlidePanel>
   );
 }
@@ -317,12 +207,10 @@ function SettingsSidebar({
 export interface TopbarProps {
   session: Session | null;
   streak: number;
-  difficulty: string;
-  onDifficultyChange: (d: string) => void;
   onOpenLearn: () => void;
+  onOpenLeaderboard: () => void;
   showHint?: boolean;
   onToggleHint?: () => void;
-  onBackToMenu?: () => void;
   hasPlayedToday?: boolean;
   onStartPlay?: () => void;
   onPlaySandbox?: () => void;
@@ -331,15 +219,26 @@ export interface TopbarProps {
 export function Topbar({
   session,
   streak,
-  difficulty,
-  onDifficultyChange,
   onOpenLearn,
-  onBackToMenu,
+  onOpenLeaderboard,
   hasPlayedToday,
   onStartPlay,
   onPlaySandbox,
 }: TopbarProps) {
-  const [showSettings, setShowSettings] = useState(false);
+  const [showNav, setShowNav] = useState(false);
+
+  const iconBtnStyle: React.CSSProperties = {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    color: C.secondary,
+    width: "56px",
+    height: "56px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "color 0.15s",
+  };
 
   return (
     <>
@@ -356,76 +255,38 @@ export function Topbar({
           alignItems: "center",
         }}
       >
+        {/* Left — ? help */}
         <button
           onClick={onOpenLearn}
           aria-label="Help / Learn"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: C.secondary,
-            fontSize: "18px",
-            fontWeight: 600,
-            fontFamily: C.font,
-            width: "56px",
-            height: "56px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "color 0.15s",
-          }}
+          style={{ ...iconBtnStyle, fontSize: "18px", fontWeight: 600, fontFamily: C.font }}
           onMouseEnter={(e) => (e.currentTarget.style.color = C.primary)}
           onMouseLeave={(e) => (e.currentTarget.style.color = C.secondary)}
         >
           ?
         </button>
 
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: "18px",
-            fontWeight: 700,
-            color: C.primary,
-            fontFamily: C.font,
-            letterSpacing: "-0.01em",
-          }}
-        >
-          PromptShot 🎯
-        </div>
+        {/* Center — empty */}
+        <div style={{ textAlign: "center" }} />
 
+        {/* Right — 🏆 leaderboard */}
         <button
-          onClick={() => setShowSettings(true)}
-          aria-label="Settings"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: C.secondary,
-            fontSize: "20px",
-            fontFamily: C.font,
-            width: "56px",
-            height: "56px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "color 0.15s",
-          }}
+          onClick={onOpenLeaderboard}
+          aria-label="Leaderboard"
+          style={{ ...iconBtnStyle, fontSize: "20px" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = C.primary)}
           onMouseLeave={(e) => (e.currentTarget.style.color = C.secondary)}
         >
-          ≡
+          🏆
         </button>
       </div>
 
-      <SettingsSidebar
-        open={showSettings}
-        onClose={() => setShowSettings(false)}
+      <NavMenu
+        open={showNav}
+        onClose={() => setShowNav(false)}
         session={session}
         streak={streak}
-        difficulty={difficulty}
-        onDifficultyChange={onDifficultyChange}
         onOpenLearn={onOpenLearn}
-        onBackToMenu={onBackToMenu}
         hasPlayedToday={hasPlayedToday}
         onStartPlay={onStartPlay}
         onPlaySandbox={onPlaySandbox}

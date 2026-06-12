@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import type { Challenge } from "../lib/supabase";
 import { calculateAndUpdateStreak } from "../lib/streak";
 import { LearnPanel } from "./components/LearnPanel";
+import { LeaderboardModal } from "./components/LeaderboardModal";
 import { Topbar } from "./components/Topbar";
 import { useGameState } from "../hooks/useGameState";
 import { scorePrompt, simulateScore, mockScore } from "../lib/scorer";
@@ -18,15 +19,17 @@ function useCountdownToMidnight() {
     const now = new Date();
     const midnight = new Date(now);
     midnight.setHours(24, 0, 0, 0);
-    const ms = midnight.getTime() - now.getTime();
-    const totalMinutes = Math.floor(ms / 60000);
-    return { h: Math.floor(totalMinutes / 60), m: totalMinutes % 60 };
+    const totalSeconds = Math.floor((midnight.getTime() - now.getTime()) / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return { h, m, s };
   };
 
   const [timeLeft, setTimeLeft] = useState(getTimeLeft);
 
   useEffect(() => {
-    const id = setInterval(() => setTimeLeft(getTimeLeft()), 60000);
+    const id = setInterval(() => setTimeLeft(getTimeLeft()), 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -75,23 +78,115 @@ function LoadingSkeleton() {
   );
 }
 
+// ─── return screen (shown when user revisits after completing today's challenge) ─
+
+function ReturnScreen({
+  challenge,
+  score,
+  onAdmire,
+  onPlaySandbox,
+}: {
+  challenge: Challenge | null;
+  score: ScoreResult | null;
+  onAdmire: () => void;
+  onPlaySandbox: () => void;
+}) {
+  const { h, m, s } = useCountdownToMidnight();
+  const today = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const [hovered, setHovered] = useState<"admire" | "sandbox" | null>(null);
+
+  return (
+    <div
+      style={{
+        fontFamily: "Space Grotesk, system-ui, sans-serif",
+        background: "#0E1E14",
+        color: "var(--ps-text-primary)",
+        minHeight: "calc(100vh - 56px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+      }}
+    >
+      <div style={{ maxWidth: "420px", width: "100%", textAlign: "center" }}>
+        {/* Logo */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2px", marginBottom: "36px" }}>
+          <span style={{ fontFamily: "Space Grotesk", fontSize: "28px", fontWeight: 850, letterSpacing: "-0.04em", color: "var(--ps-text-primary)" }}>Prompt</span>
+          <span style={{ fontFamily: "Space Grotesk", fontSize: "28px", fontWeight: 300, fontStyle: "italic", letterSpacing: "-0.03em", color: "var(--ps-teal)", paddingRight: "4px" }}>Shot</span>
+          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--ps-amber)", alignSelf: "flex-end", marginBottom: "6px" }} />
+        </div>
+
+        {/* Heading */}
+        <div style={{ fontSize: "clamp(26px, 7vw, 36px)", fontWeight: 800, color: "var(--ps-text-primary)", lineHeight: 1.15, marginBottom: "14px", letterSpacing: "-0.02em" }}>
+          Nice shot, Prompter.
+        </div>
+
+        {/* Subtext */}
+        <div style={{ fontSize: "15px", color: "var(--ps-text-secondary)", lineHeight: 1.6, marginBottom: "32px", maxWidth: "320px", margin: "0 auto 32px" }}>
+          You've already fired today's round.{" "}
+          {score && <span>You scored <strong style={{ color: "var(--ps-amber)" }}>{score.total}/300</strong>. </span>}
+          Come back tomorrow — or admire what you built.
+        </div>
+
+        {/* Badges */}
+        {challenge && (
+          <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "32px" }}>
+            <span style={{ background: "var(--ps-teal)", color: "#000", padding: "4px 12px", borderRadius: "9999px", fontSize: "12px", fontWeight: 600 }}>
+              {challenge.category}
+            </span>
+            <span style={{ background: "rgba(245,158,11,0.15)", color: "var(--ps-amber)", padding: "4px 12px", borderRadius: "9999px", fontSize: "12px", fontWeight: 600 }}>
+              {challenge.difficulty}
+            </span>
+          </div>
+        )}
+
+        {/* Primary CTA */}
+        <button
+          onClick={onAdmire}
+          onMouseEnter={() => setHovered("admire")}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            width: "100%",
+            height: "52px",
+            background: hovered === "admire" ? "#14B8A6" : "var(--ps-teal)",
+            color: "#000",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "16px",
+            fontWeight: 700,
+            cursor: "pointer",
+            marginBottom: "28px",
+            fontFamily: "Space Grotesk",
+            transition: "background 0.15s, transform 0.15s",
+            transform: hovered === "admire" ? "scale(1.02)" : "scale(1)",
+          }}
+        >
+          Admire your prompt →
+        </button>
+
+        {/* Date + countdown */}
+        <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)", lineHeight: 1.8 }}>
+          <div style={{ fontWeight: 600, color: "var(--ps-text-primary)" }}>{today}</div>
+          <div>Next challenge in <strong>{h}h {m}m {String(s).padStart(2, '0')}s</strong></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── already-played screen ────────────────────────────────────────────────────
 
 function AlreadyPlayed({
   score,
   challenge,
-  onOpenLearn,
   personalSavings,
   communitySavings,
-  onPlaySandbox,
   onBackToMenu,
 }: {
   score: ScoreResult | null;
   challenge: Challenge | null;
-  onOpenLearn: () => void;
   personalSavings: { waterMl: number; co2Grams: number };
   communitySavings: { waterLiters: number; co2Kg: number };
-  onPlaySandbox: () => void;
   onBackToMenu: () => void;
 }) {
   const { h, m } = useCountdownToMidnight();
@@ -117,7 +212,7 @@ function AlreadyPlayed({
   return (
     <div
       style={{
-        fontFamily: "Inter, sans-serif",
+        fontFamily: "Space Grotesk, system-ui, sans-serif",
         background: "#0E1E14", // Shipped to minty near-black since they played
         color: "var(--ps-text-primary)",
         minHeight: "calc(100vh - 56px)",
@@ -126,6 +221,61 @@ function AlreadyPlayed({
       }}
     >
       <div style={{ maxWidth: "500px", margin: "0 auto" }}>
+        <button
+          onClick={onBackToMenu}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--ps-text-secondary)",
+            fontSize: "14px",
+            cursor: "pointer",
+            padding: "8px 0",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            fontFamily: "Space Grotesk",
+            marginBottom: "16px",
+            transition: "color 0.15s ease",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ps-text-primary)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--ps-text-secondary)")}
+        >
+          ‹ Back to Home Menu
+        </button>
+
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+            <span style={{
+              fontFamily: "Space Grotesk",
+              fontSize: "22px",
+              fontWeight: 850,
+              letterSpacing: "-0.04em",
+              color: "var(--ps-text-primary)",
+            }}>
+              Prompt
+            </span>
+            <span style={{
+              fontFamily: "Space Grotesk",
+              fontSize: "22px",
+              fontWeight: 300,
+              fontStyle: "italic",
+              letterSpacing: "-0.03em",
+              color: "var(--ps-teal)",
+              paddingRight: "4px",
+            }}>
+              Shot
+            </span>
+            <span style={{
+              width: "5px",
+              height: "5px",
+              borderRadius: "50%",
+              background: "var(--ps-amber)",
+              alignSelf: "flex-end",
+              marginBottom: "5px",
+                }} />
+          </div>
+        </div>
+
         <div style={{ background: "var(--ps-surface)", borderRadius: "16px", padding: "32px" }}>
 
           {challenge && (
@@ -192,7 +342,7 @@ function AlreadyPlayed({
           )}
 
           <div style={{ fontSize: "14px", color: "#888880", textAlign: "center", marginBottom: "24px" }}>
-            Next challenge in {h}h {m}m
+            Next challenge in {h}h {m}m {String(s).padStart(2, '0')}s
           </div>
 
           {/* Lifetime & Community Eco Dashboard */}
@@ -275,62 +425,7 @@ function AlreadyPlayed({
             </div>
           </div>
 
-          <div style={{ textAlign: "center", marginBottom: "20px" }}>
-            <button
-              onClick={onOpenLearn}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#F59E0B",
-                fontSize: "14px",
-                cursor: "pointer",
-                padding: 0,
-                textDecoration: "none",
-              }}
-            >
-              Review your prompting technique →
-            </button>
-          </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
-            <button
-              onClick={onPlaySandbox}
-              style={{
-                width: "100%",
-                maxWidth: "280px",
-                height: "44px",
-                background: "var(--ps-amber)",
-                color: "#000",
-                border: "none",
-                borderRadius: "8px",
-                fontSize: "14px",
-                fontWeight: 700,
-                cursor: "pointer",
-                transition: "transform 0.15s ease",
-                fontFamily: "Space Grotesk",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            >
-              Practice Today's Challenge (Sandbox) 🎯
-            </button>
-
-            <button
-              onClick={onBackToMenu}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--ps-text-secondary)",
-                fontSize: "14px",
-                cursor: "pointer",
-                padding: "8px",
-                textDecoration: "underline",
-                fontFamily: "Space Grotesk",
-              }}
-            >
-              Back to Home Menu
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -340,73 +435,151 @@ function AlreadyPlayed({
 // ─── Water Glass Effect Component ──────────────────────────────────────────────
 
 function WaterGlass({ waterMl }: { waterMl: number }) {
-  const [fillHeight, setFillHeight] = useState(0);
+  const [fillPct, setFillPct] = useState(0);
+  const glassW = 72;
+  const glassH = 120;
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      // Map 10ml to 30%, scale up linearly, max out at 95%
-      const target = Math.min(95, Math.max(15, (waterMl / 35) * 100));
-      setFillHeight(target);
+      const target = Math.min(90, Math.max(18, (waterMl / 35) * 100));
+      setFillPct(target);
     }, 300);
     return () => clearTimeout(timer);
   }, [waterMl]);
 
+  // Fill level in pixels from the bottom
+  const fillY = glassH - (glassH * fillPct) / 100;
+
+  // Wave path: sinusoidal wave across the glass top, clipped to glass shape
+  // We animate translateX on a wide wave path for the sloshing effect
+  const waveWidth = glassW * 3; // 3x wide so we can animate left-right
+
   return (
-    <div
-      style={{
-        position: "relative",
-        width: "60px",
-        height: "110px",
-        border: "2px solid rgba(255, 255, 255, 0.15)",
-        borderBottomLeftRadius: "12px",
-        borderBottomRightRadius: "12px",
-        borderTop: "none",
-        background: "rgba(255, 255, 255, 0.02)",
-        backdropFilter: "blur(8px)",
-        overflow: "hidden",
-        boxSizing: "border-box",
-        display: "flex",
-        alignItems: "flex-end",
-      }}
-    >
-      {/* Liquid Fill */}
-      <div
-        style={{
-          width: "100%",
-          height: `${fillHeight}%`,
-          background: "var(--ps-teal)",
-          position: "relative",
-          transition: "height 2.5s cubic-bezier(0.1, 0.8, 0.2, 1)",
-          overflow: "hidden",
-        }}
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <svg
+        width={glassW}
+        height={glassH}
+        viewBox={`0 0 ${glassW} ${glassH}`}
+        style={{ overflow: "visible" }}
       >
-        {/* Spinning Wave 1 */}
-        <div
-          style={{
-            width: "200%",
-            height: "200%",
-            background: "var(--ps-surface)",
-            position: "absolute",
-            left: "-50%",
-            top: "-190%",
-            borderRadius: "38%",
-            animation: "wave-spin 6s linear infinite",
-          }}
+        <defs>
+          {/* Keyframes injected via <style> inside SVG */}
+          <style>{`
+            @keyframes wave-move {
+              0%   { transform: translateX(0); }
+              50%  { transform: translateX(-${glassW}px); }
+              100% { transform: translateX(0); }
+            }
+            @keyframes wave-move2 {
+              0%   { transform: translateX(-${glassW * 0.5}px); }
+              50%  { transform: translateX(${glassW * 0.5}px); }
+              100% { transform: translateX(-${glassW * 0.5}px); }
+            }
+            @keyframes fill-rise {
+              from { opacity: 0; }
+              to   { opacity: 1; }
+            }
+          `}</style>
+
+          {/* Glass shape clip path (rounded bottom beaker shape) */}
+          <clipPath id="glass-clip">
+            <path d={`
+              M 4 0
+              L ${glassW - 4} 0
+              L ${glassW - 2} ${glassH - 14}
+              Q ${glassW - 2} ${glassH} ${glassW - 14} ${glassH}
+              L 14 ${glassH}
+              Q 2 ${glassH} 2 ${glassH - 14}
+              Z
+            `} />
+          </clipPath>
+        </defs>
+
+        {/* Glass body (frosted outline) */}
+        <path
+          d={`
+            M 4 0
+            L ${glassW - 4} 0
+            L ${glassW - 2} ${glassH - 14}
+            Q ${glassW - 2} ${glassH} ${glassW - 14} ${glassH}
+            L 14 ${glassH}
+            Q 2 ${glassH} 2 ${glassH - 14}
+            Z
+          `}
+          fill="rgba(255,255,255,0.02)"
+          stroke="rgba(255,255,255,0.12)"
+          strokeWidth="1.5"
         />
-        {/* Spinning Wave 2 (for depth) */}
-        <div
-          style={{
-            width: "200%",
-            height: "200%",
-            background: "rgba(18, 28, 20, 0.6)",
-            position: "absolute",
-            left: "-60%",
-            top: "-185%",
-            borderRadius: "40%",
-            animation: "wave-spin 8s linear infinite",
-          }}
-        />
-      </div>
+
+        {/* Water fill group — clipped to glass shape */}
+        <g clipPath="url(#glass-clip)">
+          {/* Water body (solid color beneath wave) */}
+          <rect
+            x={0}
+            y={fillY + 8}  /* slightly below wave peak so no gap */
+            width={glassW}
+            height={glassH - fillY}
+            fill="#14B8A6"
+            style={{ transition: "y 2.5s cubic-bezier(0.1,0.8,0.2,1)" }}
+          />
+
+          {/* Animated wave 1 (primary) */}
+          <g style={{
+            animation: "wave-move 4s ease-in-out infinite",
+            transition: "transform 2.5s cubic-bezier(0.1,0.8,0.2,1)",
+          }}>
+            <path
+              d={`
+                M ${-glassW} ${fillY}
+                Q ${-glassW + glassW * 0.25} ${fillY - 8} ${-glassW + glassW * 0.5} ${fillY}
+                Q ${-glassW + glassW * 0.75} ${fillY + 8} ${-glassW + glassW} ${fillY}
+                Q ${-glassW + glassW * 1.25} ${fillY - 8} ${-glassW + glassW * 1.5} ${fillY}
+                Q ${-glassW + glassW * 1.75} ${fillY + 8} ${-glassW + glassW * 2} ${fillY}
+                Q ${-glassW + glassW * 2.25} ${fillY - 8} ${-glassW + glassW * 2.5} ${fillY}
+                Q ${-glassW + glassW * 2.75} ${fillY + 8} ${-glassW + glassW * 3} ${fillY}
+                L ${-glassW + glassW * 3} ${glassH}
+                L ${-glassW} ${glassH}
+                Z
+              `}
+              fill="#14B8A6"
+            />
+          </g>
+
+          {/* Animated wave 2 (secondary, darker — depth/shadow effect) */}
+          <g style={{
+            animation: "wave-move2 5.5s ease-in-out infinite",
+          }}>
+            <path
+              d={`
+                M ${-glassW} ${fillY + 4}
+                Q ${-glassW + glassW * 0.25} ${fillY - 4} ${-glassW + glassW * 0.5} ${fillY + 4}
+                Q ${-glassW + glassW * 0.75} ${fillY + 12} ${-glassW + glassW} ${fillY + 4}
+                Q ${-glassW + glassW * 1.25} ${fillY - 4} ${-glassW + glassW * 1.5} ${fillY + 4}
+                Q ${-glassW + glassW * 1.75} ${fillY + 12} ${-glassW + glassW * 2} ${fillY + 4}
+                Q ${-glassW + glassW * 2.25} ${fillY - 4} ${-glassW + glassW * 2.5} ${fillY + 4}
+                Q ${-glassW + glassW * 2.75} ${fillY + 12} ${-glassW + glassW * 3} ${fillY + 4}
+                L ${-glassW + glassW * 3} ${glassH}
+                L ${-glassW} ${glassH}
+                Z
+              `}
+              fill="rgba(10,30,20,0.35)"
+            />
+          </g>
+
+          {/* Shimmer highlight — a soft diagonal stripe */}
+          <rect
+            x={8}
+            y={fillY + 6}
+            width={6}
+            height={glassH - fillY}
+            rx={3}
+            fill="rgba(255,255,255,0.08)"
+          />
+        </g>
+
+        {/* Rim highlight (top edge glint) */}
+        <line x1={4} y1={1} x2={glassW - 4} y2={1} stroke="rgba(255,255,255,0.18)" strokeWidth={1} />
+      </svg>
     </div>
   );
 }
@@ -500,6 +673,8 @@ export default function App() {
   const [isPlayingStarted, setIsPlayingStarted] = useState(false);
   const [isSandboxMode, setIsSandboxMode] = useState(false);
   const [hasPlayedToday, setHasPlayedToday] = useState(false);
+  const [hasClickedAdmire, setHasClickedAdmire] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [difficulty, setDifficulty] = useState<string>(
     () => safeStorage.getItem("promptshot_difficulty") ?? "BEGINNER",
   );
@@ -671,7 +846,8 @@ export default function App() {
         }
       }
 
-      transitionToState("challenge");
+      // Go directly to return screen if they've already played, otherwise challenge
+      transitionToState(hasPlayed ? "already-played" : "challenge");
     })();
   }, [session, difficulty, sessionLoading]);
 
@@ -816,12 +992,10 @@ export default function App() {
     <Topbar
       session={session}
       streak={streak}
-      difficulty={difficulty}
-      onDifficultyChange={handleDifficultyChange}
       onOpenLearn={() => setShowLearnPanel(true)}
+      onOpenLeaderboard={() => setShowLeaderboard(true)}
       showHint={showHint}
       onToggleHint={() => setShowHint((v) => !v)}
-      onBackToMenu={handleBackToMenu}
       hasPlayedToday={hasPlayedToday}
       onStartPlay={() => {
         setIsSandboxMode(false);
@@ -836,7 +1010,7 @@ export default function App() {
 
   const isEcoState = gameState === "impact" || gameState === "results" || gameState === "already-played";
   const contentStyle: React.CSSProperties = {
-    fontFamily: "Inter, sans-serif",
+    fontFamily: "Space Grotesk, system-ui, sans-serif",
     background: isEcoState ? "#0E1E14" : "var(--ps-background)",
     color: "var(--ps-text-primary)",
     minHeight: "calc(100vh - 56px)",
@@ -845,18 +1019,33 @@ export default function App() {
   };
 
   if (gameState === "already-played") {
+    // Show the welcoming return screen first; only show full stats after user clicks "Admire"
+    if (!hasClickedAdmire) {
+      return (
+        <>
+          {topbar}
+          <ReturnScreen
+            challenge={challenge}
+            score={score}
+            onAdmire={() => setHasClickedAdmire(true)}
+            onPlaySandbox={handlePlaySandbox}
+          />
+          <LeaderboardModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} session={session} />
+          <LearnPanel isOpen={showLearnPanel} onClose={() => setShowLearnPanel(false)} />
+        </>
+      );
+    }
     return (
       <>
         {topbar}
         <AlreadyPlayed
           score={score}
           challenge={challenge}
-          onOpenLearn={() => setShowLearnPanel(true)}
           personalSavings={personalSavings}
           communitySavings={communitySavings}
-          onPlaySandbox={handlePlaySandbox}
           onBackToMenu={handleBackToMenu}
         />
+        <LeaderboardModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} session={session} />
         <LearnPanel isOpen={showLearnPanel} onClose={() => setShowLearnPanel(false)} />
       </>
     );
@@ -869,6 +1058,64 @@ export default function App() {
       {topbar}
       <div style={contentStyle}>
         <div style={{ maxWidth: "500px", margin: "0 auto" }}>
+          {/* Back button below question mark (top-left) */}
+          {isPlayingStarted && (
+            <button
+              onClick={handleBackToMenu}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--ps-text-secondary)",
+                fontSize: "14px",
+                cursor: "pointer",
+                padding: "8px 0",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                fontFamily: "Space Grotesk",
+                marginBottom: "16px",
+                transition: "color 0.15s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ps-text-primary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--ps-text-secondary)")}
+            >
+              ‹ Back to Home Menu
+            </button>
+          )}
+          {isPlayingStarted && (
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+                <span style={{
+                  fontFamily: "Space Grotesk",
+                  fontSize: "22px",
+                  fontWeight: 850,
+                  letterSpacing: "-0.04em",
+                  color: "var(--ps-text-primary)",
+                }}>
+                  Prompt
+                </span>
+                <span style={{
+                  fontFamily: "Space Grotesk",
+                  fontSize: "22px",
+                  fontWeight: 300,
+                  fontStyle: "italic",
+                  letterSpacing: "-0.03em",
+                  color: "var(--ps-teal)",
+                  paddingRight: "4px",
+                }}>
+                  Shot
+                </span>
+                <span style={{
+                  width: "5px",
+                  height: "5px",
+                  borderRadius: "50%",
+                  background: "var(--ps-amber)",
+                  alignSelf: "flex-end",
+                  marginBottom: "5px",
+                }} />
+              </div>
+            </div>
+          )}
 
           {/* Landing View: Play Challenge Button */}
           {gameState === "challenge" && !isPlayingStarted && (
@@ -883,46 +1130,84 @@ export default function App() {
                 padding: "24px",
               }}
             >
-              {/* Spinning target graphic */}
-              <div
-                style={{
-                  width: "120px",
-                  height: "120px",
-                  borderRadius: "50%",
-                  border: "2px dashed rgba(245, 158, 11, 0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: "32px",
-                  animation: "wave-spin 20s linear infinite",
-                }}
-              >
-                <div
-                  style={{
-                    width: "80px",
-                    height: "80px",
-                    borderRadius: "50%",
-                    border: "2px solid var(--ps-amber)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <span style={{ fontSize: "28px" }}>🎯</span>
-                </div>
+              {/* Premium Animated SVG Target & Bow/Arrow */}
+              <div style={{ width: "160px", height: "160px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
+                <svg width="160" height="160" viewBox="0 0 160 160" style={{ overflow: "visible" }}>
+                  {/* Animated Ripple Circle */}
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="14"
+                    fill="none"
+                    stroke="var(--ps-amber)"
+                    style={{
+                      animation: "ripple-expand 4.5s ease-out infinite",
+                      transformOrigin: "80px 80px",
+                    }}
+                  />
+                  
+                  {/* Target Base (wobbles on impact) */}
+                  <g style={{ animation: "target-wobble 4.5s ease-out infinite", transformOrigin: "80px 80px" }}>
+                    {/* Outer Dashed Ring */}
+                    <circle cx="80" cy="80" r="56" fill="none" stroke="rgba(20, 184, 166, 0.15)" strokeWidth="1.5" strokeDasharray="6 4" />
+                    {/* Middle Teal Ring */}
+                    <circle cx="80" cy="80" r="42" fill="none" stroke="var(--ps-teal)" strokeWidth="3" />
+                    {/* Inner Primary Dashed Ring */}
+                    <circle cx="80" cy="80" r="28" fill="none" stroke="var(--ps-text-primary)" strokeWidth="1.5" strokeDasharray="4 3" />
+                    {/* Center Amber Bullseye */}
+                    <circle cx="80" cy="80" r="14" fill="var(--ps-amber)" />
+                    {/* Innermost dot */}
+                    <circle cx="80" cy="80" r="5" fill="#000" />
+                  </g>
+
+                  {/* Arrow (shoots in) */}
+                  <g
+                    id="arrow-group"
+                    style={{
+                      animation: "arrow-shoot 4.5s infinite",
+                      transformOrigin: "0px 0px",
+                    }}
+                  >
+                    {/* Arrow Shaft */}
+                    <line x1="-32" y1="0" x2="-2" y2="0" stroke="var(--ps-text-primary)" strokeWidth="2" strokeLinecap="round" />
+                    {/* Arrow Fletching (Teal feathers) */}
+                    <path d="M -32 -5 L -24 0 L -32 5 L -37 5 L -30 0 L -37 -5 Z" fill="var(--ps-teal)" />
+                    {/* Arrow Head (Amber tip) */}
+                    <polygon points="0,0 -8,-4 -6,0 -8,4" fill="var(--ps-amber)" />
+                  </g>
+                </svg>
               </div>
 
-              <h1
-                style={{
+              <div style={{ display: "flex", alignItems: "center", gap: "2px", justifyContent: "center", marginBottom: "12px" }}>
+                <span style={{
                   fontFamily: "Space Grotesk",
-                  fontSize: "32px",
-                  fontWeight: 600,
+                  fontSize: "36px",
+                  fontWeight: 800,
+                  letterSpacing: "-0.04em",
                   color: "var(--ps-text-primary)",
-                  marginBottom: "12px",
-                }}
-              >
-                PromptShot
-              </h1>
+                }}>
+                  Prompt
+                </span>
+                <span style={{
+                  fontFamily: "Space Grotesk",
+                  fontSize: "36px",
+                  fontWeight: 400,
+                  fontStyle: "italic",
+                  letterSpacing: "-0.03em",
+                  color: "var(--ps-teal)",
+                  paddingRight: "6px",
+                }}>
+                  Shot
+                </span>
+                <span style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: "var(--ps-amber)",
+                  alignSelf: "flex-end",
+                  marginBottom: "8px",
+                }} />
+              </div>
               
               <p
                 style={{
@@ -935,6 +1220,59 @@ export default function App() {
               >
                 Can you shoot a perfect prompt? Stop chatting with AI like it's your therapist and get the output in one clean shot. Thirsty data centers are counting on you.
               </p>
+
+              {/* Difficulty Segmented Selector */}
+              <div style={{ marginBottom: "24px", width: "100%", maxWidth: "280px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--ps-text-secondary)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    fontFamily: "var(--ps-font-mono)",
+                    marginBottom: "8px",
+                    textAlign: "center",
+                  }}
+                >
+                  Select Level
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid var(--ps-border)",
+                    borderRadius: "24px",
+                    padding: "4px",
+                    gap: "4px",
+                  }}
+                >
+                  {(["BEGINNER", "PRO", "EXPERT"] as const).map((d) => {
+                    const isSelected = difficulty === d;
+                    return (
+                      <button
+                        key={d}
+                        onClick={() => handleDifficultyChange(d)}
+                        style={{
+                          flex: 1,
+                          height: "32px",
+                          background: isSelected ? "var(--ps-amber)" : "transparent",
+                          color: isSelected ? "#000" : "var(--ps-text-secondary)",
+                          border: "none",
+                          borderRadius: "20px",
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          fontFamily: "Space Grotesk",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {hasPlayedToday ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", alignItems: "center" }}>
@@ -1386,7 +1724,7 @@ export default function App() {
                   Share result
                 </button>
 
-                {isSandboxMode ? (
+                {isSandboxMode && (
                   <div style={{ display: "flex", gap: "12px", width: "100%" }}>
                     <button
                       onClick={() => {
@@ -1445,39 +1783,13 @@ export default function App() {
                       Back to Menu
                     </button>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => transitionToState("already-played")}
-                    style={{
-                      width: "100%",
-                      height: "48px",
-                      background: "transparent",
-                      border: "1px solid var(--ps-border)",
-                      color: "var(--ps-text-primary)",
-                      borderRadius: "8px",
-                      fontSize: "var(--ps-text-secondary-size)",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      fontFamily: "Space Grotesk",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-                      e.currentTarget.style.borderColor = "var(--ps-amber)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.borderColor = "var(--ps-border)";
-                    }}
-                  >
-                    Go to Dashboard
-                  </button>
                 )}
               </div>
             </>
           )}
         </div>
       </div>
+      <LeaderboardModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} session={session} />
       <LearnPanel isOpen={showLearnPanel} onClose={() => setShowLearnPanel(false)} />
     </>
   );

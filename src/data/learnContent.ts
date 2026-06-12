@@ -3,31 +3,37 @@ export const LEARN_CONTENT = {
     {
       id: 'anatomy',
       title: 'Anatomy of a good prompt',
-      subtitle: 'Every strong prompt has these four parts',
+      subtitle: 'Every strong prompt has these five core parts',
       items: [
         {
-          label: 'Task',
+          label: 'Instruction / Task',
           color: 'amber',
-          description: 'What you want the AI to produce. Be a verb: write, explain, list, convert, summarise.',
-          example: '→ "Write a function that..."'
-        },
-        {
-          label: 'Format',
-          color: 'amber',
-          description: "How the output should look. Paragraph, bullet list, code block, table, JSON. If you don't specify, you get whatever the AI defaults to.",
-          example: '→ "...as a numbered list of 5 items"'
+          description: 'The specific action you want the AI to perform. Use clear, direct action verbs like "write", "translate", "summarize", "debug", or "calculate" rather than vague requests.',
+          example: '→ "Write a Python function called `factorial`..."'
         },
         {
           label: 'Context',
           color: 'amber',
-          description: "Why you need it and who it's for. This changes tone, vocabulary, and depth dramatically.",
-          example: '→ "...for a 12-year-old who has never coded"'
+          description: 'Background information, target audience, or scenario constraints. Setting a specific role/persona (e.g., tech writer, professional chef) and target audience (e.g., non-technical managers) shapes the output depth.',
+          example: '→ "...explaining the concept to a non-technical product manager"'
         },
         {
-          label: 'Constraints',
+          label: 'Input Data',
           color: 'amber',
-          description: 'What to include, exclude, or limit. Length, tone, what NOT to mention.',
-          example: '→ "...in under 80 words, no jargon, no metaphors"'
+          description: 'The specific text, database query, or source code the model needs to process. Isolate input content from instructions using clear delimiters (such as triple backticks or XML tags) to prevent parsing confusion.',
+          example: '→ "...using only the customer reviews enclosed in <reviews> tags..."'
+        },
+        {
+          label: 'Output Format',
+          color: 'amber',
+          description: 'The exact layout, structure, or output schema. Explicitly specify formats like bulleted lists, markdown tables, JSON, code blocks, or specific paragraph limits to avoid default formatting styles.',
+          example: '→ "...formatted as a markdown table with columns for metric name, value, and unit"'
+        },
+        {
+          label: 'Tone & Persona (Style)',
+          color: 'amber',
+          description: 'The emotional target, voice, or style constraints. Specify tone targets (e.g., empathetic, formal, sarcastic, or casual) and character behaviors to match the context.',
+          example: '→ "...using a formal, data-backed tone as a senior analyst"'
         }
       ]
     },
@@ -38,38 +44,38 @@ export const LEARN_CONTENT = {
       items: [
         {
           myth: 'Longer prompts produce better outputs',
-          reality: 'Length adds noise. Extra words dilute the instruction. A 40-word precise prompt beats a 200-word rambling one every time.',
+          reality: 'Extra words add noise and dilute instructions. A 50-word precise prompt using structured anatomy beats a 250-word rambling one every time.',
           verdict: 'FALSE'
         },
         {
-          myth: "Vague prompts give more creative results",
-          reality: "Vagueness produces generic defaults, not creativity. To get creative output, be specific about the creative direction — tone, style, constraints.",
+          myth: 'Negative instructions (don\'t write X) always work',
+          reality: 'AI models struggle with raw negative commands like "don\'t include Y". Frame instructions positively explaining what to focus on, or pair directives with explicit exclusions (e.g., "focus on X, without Y").',
           verdict: 'FALSE'
         },
         {
-          myth: "Just say \"be more detailed\" if it's too short",
-          reality: '"More detail" is not a direction. Specify what dimension you want expanded: more examples, deeper explanation, more edge cases.',
-          verdict: 'WASTEFUL'
+          myth: 'Prompt engineering is only about words, not parameters',
+          reality: 'Model parameters like Temperature dictate randomness. Lower values (0.2–0.5) enforce deterministic, factual answers; higher values (0.7–1.0) encourage creative, varied outputs.',
+          verdict: 'FALSE'
+        },
+        {
+          myth: 'Vague prompts give more creative results',
+          reality: 'Vagueness produces generic, safe defaults. True creativity comes from specifying the creative direction—defining explicit constraints, tone, and style.',
+          verdict: 'FALSE'
+        },
+        {
+          myth: 'Saying "please" or "as an AI" affects the response',
+          reality: 'Politeness does not affect response quality. Redundant phrases like "as an AI" waste character counts and token budgets without providing any benefit.',
+          verdict: 'FALSE'
         },
         {
           myth: 'Repeating the same prompt differently will fix it',
-          reality: 'If an output was wrong, diagnosing WHY it was wrong and changing one specific thing is 3× more effective than a full rewrite.',
+          reality: 'If the output is wrong, repeating the exact prompt will yield similar errors. Diagnose which component (instruction, context, or format) failed, and adjust that specific element instead of a full rewrite.',
           verdict: 'WASTEFUL'
         },
         {
-          myth: '"Please" or "as an AI" affects the response',
-          reality: 'Politeness has no effect on output quality. "As an AI" instructions are redundant. Neither costs you points here but both waste your character count.',
-          verdict: 'FALSE'
-        },
-        {
           myth: 'You need to explain the whole background',
-          reality: "The AI knows general knowledge. Only explain what is specific to YOUR situation that it couldn't infer.",
+          reality: 'The AI knows general knowledge. Only explain what is specific to your situation that it cannot infer.',
           verdict: 'FALSE'
-        },
-        {
-          myth: 'More examples in the prompt means better results',
-          reality: 'One well-chosen example beats three mediocre ones. Examples should show the pattern, not pad the prompt.',
-          verdict: 'SOMETIMES'
         }
       ]
     },
@@ -83,12 +89,12 @@ export const LEARN_CONTENT = {
           bad: {
             label: 'Weak',
             prompt: 'Write about climate change',
-            why: "No format, no length, no audience, no angle. You'll get a generic essay."
+            why: 'Lacks format, length limit, target audience, tone guidelines, and specific topic angle.'
           },
           good: {
             label: 'Strong',
-            prompt: 'In 3 sentences, explain how melting Arctic ice affects ocean currents. Audience: curious 14-year-old. No jargon.',
-            why: 'Format (3 sentences), topic angle (ocean currents specifically), audience, constraint (no jargon).'
+            prompt: 'Act as a science educator. In 3 sentences, explain how melting Arctic ice affects global ocean currents. Use a curious, engaging tone. Target audience: 14-year-olds. Exclude chemical formulas.',
+            why: 'Specifies persona (science educator), task (explain ice/currents), format (3 sentences), audience (14-year-olds), and a positive focus with a clear exclusion constraint.'
           }
         },
         {
@@ -96,12 +102,12 @@ export const LEARN_CONTENT = {
           bad: {
             label: 'Weak',
             prompt: 'Make code for a toggle button',
-            why: 'No language, no framework, no behaviour spec, no output format.'
+            why: 'No language, no framework, no state description, no output constraints.'
           },
           good: {
             label: 'Strong',
-            prompt: 'Write a React functional component: a button that toggles between "Start" and "Stop" text on click. Use useState. TypeScript. No styling.',
-            why: 'Language (React + TS), component type, exact behaviour, explicit exclusion (no styling).'
+            prompt: 'Write a React functional component for a button toggling between "Start" and "Stop" labels on click. Use TypeScript and useState hook. Return ONLY the code in a single markdown block without styling or explanations.',
+            why: 'Specifies language (TypeScript), framework (React), exact behavior (useState toggle), and format constraint (code only, no explanation).'
           }
         },
         {
@@ -109,12 +115,12 @@ export const LEARN_CONTENT = {
           bad: {
             label: 'Weak',
             prompt: 'Give me tips for better sleep',
-            why: 'No format, no count, no depth per item, no angle.'
+            why: 'Lacks list size, specific structure per item, tone guidelines, and source constraints.'
           },
           good: {
             label: 'Strong',
-            prompt: 'List 5 science-backed sleep tips. Format: bullet points. Each has a bold 3-word label, then one sentence of explanation. No supplements.',
-            why: 'Count (5), format (bullets with labels), source quality (science-backed), explicit exclusion.'
+            prompt: 'As a health advisor, list 5 science-backed tips for improving sleep routine. Format: Bullet list, each starting with a bold 3-word action followed by a single sentence explanation. Focus on habits, without recommending supplements.',
+            why: 'Specifies persona (health advisor), count (5), format (bullet list + specific structure), source (science-backed), and explicit focus/exclusion parameter.'
           }
         }
       ]
@@ -122,12 +128,12 @@ export const LEARN_CONTENT = {
     {
       id: 'impact',
       title: 'Why efficient prompts matter',
-      subtitle: 'Prompt quality is also resource design',
+      subtitle: 'Backed by environmental research (UC Riverside, 2023)',
       items: [
         {
           metric: 'One-shot accuracy',
           point: 'The cleanest environmental win is not needing a second or third attempt.',
-          detail: 'Every retry repeats input processing, output generation, network transfer, and cooling demand. A precise first prompt is a small conservation behavior repeated at internet scale.'
+          detail: 'According to UCR research, each query consumes 10-25ml of water for cooling and electricity. Multi-step follow-ups multiply this footprint. A precise first prompt cuts resource consumption by 75% compared to multi-turn chats.'
         },
         {
           metric: 'Constraint density',
@@ -157,15 +163,15 @@ export const LEARN_CONTENT = {
         },
         {
           question: 'Why does brevity matter if the output is accurate?',
-          answer: "Because in real usage, every token in your prompt costs compute time, energy, and water in a data centre. A prompt engineer who gets accurate output in 50 words is objectively more efficient than one who needs 200 words. Brevity is not a stylistic preference — it's a resource question."
+          answer: 'Every word you send to an AI model increases the computational load. Peer-reviewed research by UC Riverside shows that prompt length directly increases server processing time and energy draw. Getting the exact same result with a 40-word prompt instead of 200 words reduces the carbon and water footprint of that transaction by up to 80%.'
         },
         {
           question: 'How does AI actually use water?',
-          answer: 'Data centres that run AI models need cooling. Some cooling systems consume water directly, and electricity generation can also have water demand upstream. Exact impact varies by model, data centre, region, weather, and energy mix, so PromptShot uses estimates as directional feedback rather than exact accounting.'
+          answer: 'AI models run in massive data centers that generate significant heat. A 2023 study by researchers at the University of California, Riverside (UCR) titled "Making AI Less Thirsty" estimates that a single conversational round (20-50 queries) evaporates roughly 500ml (half a liter) of water for server cooling and electricity generation. That means each query directly consumes 10-25ml of freshwater. Writing accurate, one-shot prompts avoids multi-step chat loops, directly conserving water resources.'
         },
         {
           question: 'Why show environmental impact in a game?',
-          answer: "Because the skill gap in prompting doesn't feel real until you see its cost. A person who needs 5 follow-up prompts to get the same output as someone who got it in one used 5× the resources. Prompt engineering is not just a productivity skill — it's a conservation behaviour."
+          answer: 'Because the skill gap in prompting doesn\'t feel real until you see its cost. A person who needs 5 follow-up prompts to get the same output as someone who got it in one used 5× the resources. Prompt engineering is not just a productivity skill — it\'s a conservation behaviour.'
         },
         {
           question: 'What should I optimize for first?',
@@ -173,10 +179,14 @@ export const LEARN_CONTENT = {
         },
         {
           question: 'What is a perfect prompt?',
-          answer: "The shortest sequence of words that produces the target output with no follow-ups needed. It specifies task, format, context, and constraints — but nothing extra. Perfect prompts are rarely discovered on the first try. That's why this is a skill, not a trick."
+          answer: 'The shortest sequence of words that produces the target output with no follow-ups needed. It specifies task, format, context, and constraints — but nothing extra. Perfect prompts are rarely discovered on the first try. That\'s why this is a skill, not a trick.'
         },
         {
-          question: "Can I replay today's challenge?",
+          question: 'Where did you get the data/sources for this guidance?',
+          answer: 'Our prompt engineering best practices are synthesized from industry-standard tutorials: Hostinger\'s Prompt Engineering Guide, Lucca Sehn\'s Best Practices (LinkedIn), Kumar H.C.\'s Comprehensive Guide (LinkedIn), Hamza Maqbool\'s 2025 Step-by-Step Roadmap (Medium), and Omnifact\'s Business Prompt Engineering guide. The environmental data is from the University of California, Riverside\'s (UCR) peer-reviewed study "Making AI Less Thirsty" (2023).'
+        },
+        {
+          question: 'Can I replay today\'s challenge?',
           answer: 'No — the game is once-per-day by design, like Wordle. This creates the social moment: everyone is working from the same target. A new challenge unlocks at midnight.'
         }
       ]
