@@ -110,6 +110,10 @@ function SettingsSidebar({
   difficulty,
   onDifficultyChange,
   onOpenLearn,
+  onBackToMenu,
+  hasPlayedToday,
+  onStartPlay,
+  onPlaySandbox,
 }: {
   open: boolean;
   onClose: () => void;
@@ -118,6 +122,10 @@ function SettingsSidebar({
   difficulty: string;
   onDifficultyChange: (d: string) => void;
   onOpenLearn: () => void;
+  onBackToMenu?: () => void;
+  hasPlayedToday?: boolean;
+  onStartPlay?: () => void;
+  onPlaySandbox?: () => void;
 }) {
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -225,6 +233,35 @@ function SettingsSidebar({
         Prompt Engineering 101 ›
       </button>
 
+      {hasPlayedToday ? (
+        onPlaySandbox && (
+          <button
+            onClick={() => { onClose(); onPlaySandbox(); }}
+            style={{ background: "none", border: "none", color: C.mint, fontSize: "14px", cursor: "pointer", padding: "10px 0", display: "block", width: "100%", textAlign: "left", fontFamily: C.font, fontWeight: 600 }}
+          >
+            Practice in Sandbox ›
+          </button>
+        )
+      ) : (
+        onStartPlay && (
+          <button
+            onClick={() => { onClose(); onStartPlay(); }}
+            style={{ background: "none", border: "none", color: C.mint, fontSize: "14px", cursor: "pointer", padding: "10px 0", display: "block", width: "100%", textAlign: "left", fontFamily: C.font, fontWeight: 600 }}
+          >
+            Play Today's Challenge ›
+          </button>
+        )
+      )}
+
+      {onBackToMenu && (
+        <button
+          onClick={() => { onClose(); onBackToMenu(); }}
+          style={{ background: "none", border: "none", color: C.primary, fontSize: "14px", cursor: "pointer", padding: "10px 0", display: "block", width: "100%", textAlign: "left", fontFamily: C.font }}
+        >
+          Back to Home Menu ›
+        </button>
+      )}
+
       <div style={{ height: "1px", background: C.divider, marginBottom: "24px", marginTop: "8px" }} />
 
       {session ? (
@@ -285,6 +322,10 @@ export interface TopbarProps {
   onOpenLearn: () => void;
   showHint?: boolean;
   onToggleHint?: () => void;
+  onBackToMenu?: () => void;
+  hasPlayedToday?: boolean;
+  onStartPlay?: () => void;
+  onPlaySandbox?: () => void;
 }
 
 export function Topbar({
@@ -293,6 +334,10 @@ export function Topbar({
   difficulty,
   onDifficultyChange,
   onOpenLearn,
+  onBackToMenu,
+  hasPlayedToday,
+  onStartPlay,
+  onPlaySandbox,
 }: TopbarProps) {
   const [showSettings, setShowSettings] = useState(false);
 
@@ -380,6 +425,10 @@ export function Topbar({
         difficulty={difficulty}
         onDifficultyChange={onDifficultyChange}
         onOpenLearn={onOpenLearn}
+        onBackToMenu={onBackToMenu}
+        hasPlayedToday={hasPlayedToday}
+        onStartPlay={onStartPlay}
+        onPlaySandbox={onPlaySandbox}
       />
     </>
   );

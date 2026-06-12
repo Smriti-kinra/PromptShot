@@ -9,6 +9,7 @@ import { useGameState } from "../hooks/useGameState";
 import { scorePrompt, simulateScore, mockScore } from "../lib/scorer";
 import type { ScoreResult } from "../lib/scorer";
 import { safeStorage } from "../lib/safeStorage";
+import { DAILY_CHALLENGES } from "./challenges";
 
 // ─── hooks ────────────────────────────────────────────────────────────────────
 
@@ -82,12 +83,16 @@ function AlreadyPlayed({
   onOpenLearn,
   personalSavings,
   communitySavings,
+  onPlaySandbox,
+  onBackToMenu,
 }: {
   score: ScoreResult | null;
   challenge: Challenge | null;
   onOpenLearn: () => void;
   personalSavings: { waterMl: number; co2Grams: number };
   communitySavings: { waterLiters: number; co2Kg: number };
+  onPlaySandbox: () => void;
+  onBackToMenu: () => void;
 }) {
   const { h, m } = useCountdownToMidnight();
 
@@ -270,7 +275,7 @@ function AlreadyPlayed({
             </div>
           </div>
 
-          <div style={{ textAlign: "center" }}>
+          <div style={{ textAlign: "center", marginBottom: "20px" }}>
             <button
               onClick={onOpenLearn}
               style={{
@@ -284,6 +289,46 @@ function AlreadyPlayed({
               }}
             >
               Review your prompting technique →
+            </button>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
+            <button
+              onClick={onPlaySandbox}
+              style={{
+                width: "100%",
+                maxWidth: "280px",
+                height: "44px",
+                background: "var(--ps-amber)",
+                color: "#000",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "transform 0.15s ease",
+                fontFamily: "Space Grotesk",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              Practice Today's Challenge (Sandbox) 🎯
+            </button>
+
+            <button
+              onClick={onBackToMenu}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--ps-text-secondary)",
+                fontSize: "14px",
+                cursor: "pointer",
+                padding: "8px",
+                textDecoration: "underline",
+                fontFamily: "Space Grotesk",
+              }}
+            >
+              Back to Home Menu
             </button>
           </div>
         </div>
@@ -373,16 +418,44 @@ function getDayOfYear(d: Date): number {
   return Math.floor((d.getTime() - start.getTime()) / 86400000);
 }
 
+function getLocalFallbackChallenge(difficulty: string): Challenge {
+  const filtered = DAILY_CHALLENGES.filter(
+    (c) => c.difficulty.toUpperCase() === difficulty.toUpperCase()
+  );
+  const pool = filtered.length > 0 ? filtered : DAILY_CHALLENGES;
+  const dayOfYear = getDayOfYear(new Date());
+  const localCh = pool[dayOfYear % pool.length];
+
+  return {
+    id: localCh.id,
+    category: localCh.category,
+    difficulty: localCh.difficulty,
+    target_output: localCh.targetOutput,
+    ideal_prompt: localCh.idealPrompt,
+    char_count: localCh.charCount,
+    active: true,
+  };
+}
+
 async function loadChallenge(difficulty: string, selectFields: string): Promise<Challenge | null> {
   const dayOfYear = getDayOfYear(new Date());
-  const { data } = await supabase
-    .from("challenges")
-    .select(selectFields)
-    .eq("difficulty", difficulty)
-    .eq("active", true)
-    .order("id");
-  if (!data || data.length === 0) return null;
-  return data[dayOfYear % data.length];
+  try {
+    const { data, error } = await supabase
+      .from("challenges")
+      .select(selectFields)
+      .eq("difficulty", difficulty)
+      .eq("active", true)
+      .order("id");
+
+    if (error || !data || data.length === 0) {
+      console.warn("Challenges query empty/failed from database, falling back to local dataset.");
+      return getLocalFallbackChallenge(difficulty);
+    }
+    return data[dayOfYear % data.length];
+  } catch (err) {
+    console.error("Error loading challenge from Supabase, falling back to local dataset:", err);
+    return getLocalFallbackChallenge(difficulty);
+  }
 }
 
 // ─── main component ───────────────────────────────────────────────────────────
@@ -424,6 +497,9 @@ export default function App() {
   });
 
   const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [isPlayingStarted, setIsPlayingStarted] = useState(false);
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
+  const [hasPlayedToday, setHasPlayedToday] = useState(false);
   const [difficulty, setDifficulty] = useState<string>(
     () => safeStorage.getItem("promptshot_difficulty") ?? "BEGINNER",
   );
@@ -466,6 +542,8 @@ export default function App() {
     setShowAutoIdeal(false);
     setAnimateScore(false);
     setUserPrompt("");
+    setIsPlayingStarted(false);
+    setIsSandboxMode(false);
 
     (async () => {
       const today = new Date().toISOString().split("T")[0];
@@ -520,6 +598,7 @@ export default function App() {
         waterMl: Math.max(0, localSavedWater),
         co2Grams: Math.max(0, localSavedCo2),
       });
+      setHasPlayedToday(hasPlayed);
 
       // ─── Fetch Global Community Savings ───
       let globalWaterMl = 0;
@@ -577,9 +656,6 @@ export default function App() {
             waterMl: existingScore.water_ml ?? 10,
             co2Grams: existingScore.co2_grams ?? 0.1,
           });
-          transitionToState("already-played");
-        } else {
-          transitionToState("challenge");
         }
       } else {
         const todayEntry = getLocalHistory().find((s) => s.played_at === today);
@@ -592,16 +668,29 @@ export default function App() {
             waterMl: todayEntry.waterMl ?? 10,
             co2Grams: todayEntry.co2Grams ?? 0.1,
           });
-          transitionToState("already-played");
-        } else {
-          transitionToState("challenge");
         }
       }
+
+      transitionToState("challenge");
     })();
   }, [session, difficulty, sessionLoading]);
 
   const handleDifficultyChange = (d: string) => {
     setDifficulty(d);
+  };
+
+  const handlePlaySandbox = () => {
+    setIsSandboxMode(true);
+    setIsPlayingStarted(true);
+    setUserPrompt("");
+    setScore(null);
+    transitionToState("challenge");
+  };
+
+  const handleBackToMenu = () => {
+    setIsPlayingStarted(false);
+    setIsSandboxMode(false);
+    transitionToState("challenge");
   };
 
   const handleSubmit = async () => {
@@ -622,40 +711,44 @@ export default function App() {
         result = mockScore(userPrompt);
       }
 
-      const today = new Date().toISOString().split("T")[0];
-      await supabase.from("scores").insert({
-        user_id: session.user.id,
-        challenge_id: challenge.id,
-        accuracy: result.accuracy,
-        format: result.format,
-        brevity: result.brevity,
-        total: result.total,
-        user_prompt: userPrompt,
-        played_at: today,
-        water_ml: result.waterMl,
-        co2_grams: result.co2Grams,
-      });
+      if (!isSandboxMode) {
+        const today = new Date().toISOString().split("T")[0];
+        await supabase.from("scores").insert({
+          user_id: session.user.id,
+          challenge_id: challenge.id,
+          accuracy: result.accuracy,
+          format: result.format,
+          brevity: result.brevity,
+          total: result.total,
+          user_prompt: userPrompt,
+          played_at: today,
+          water_ml: result.waterMl,
+          co2_grams: result.co2Grams,
+        });
 
-      const newStreak = await calculateAndUpdateStreak(session.user.id);
-      setStreak(newStreak);
+        const newStreak = await calculateAndUpdateStreak(session.user.id);
+        setStreak(newStreak);
+      }
     } else {
       result = await simulateScore(userPrompt, challenge.id);
 
-      const today = new Date().toISOString().split("T")[0];
-      saveLocalScore({
-        played_at: today,
-        accuracy: result.accuracy,
-        format: result.format,
-        brevity: result.brevity,
-        total: result.total,
-        challenge_id: challenge.id,
-        user_prompt: userPrompt,
-        waterMl: result.waterMl,
-        co2Grams: result.co2Grams,
-      });
+      if (!isSandboxMode) {
+        const today = new Date().toISOString().split("T")[0];
+        saveLocalScore({
+          played_at: today,
+          accuracy: result.accuracy,
+          format: result.format,
+          brevity: result.brevity,
+          total: result.total,
+          challenge_id: challenge.id,
+          user_prompt: userPrompt,
+          waterMl: result.waterMl,
+          co2Grams: result.co2Grams,
+        });
 
-      const newStreak = calculateLocalStreak();
-      setStreak(newStreak);
+        const newStreak = calculateLocalStreak();
+        setStreak(newStreak);
+      }
     }
 
     setScore(result);
@@ -663,17 +756,19 @@ export default function App() {
       setIdealPrompt(result.idealPrompt);
     }
 
-    // Dynamic savings update
-    const savedWaterThisTurn = 50 - result.waterMl;
-    const savedCo2ThisTurn = 0.5 - result.co2Grams;
-    setPersonalSavings((prev) => ({
-      waterMl: prev.waterMl + savedWaterThisTurn,
-      co2Grams: prev.co2Grams + savedCo2ThisTurn,
-    }));
-    setCommunitySavings((prev) => ({
-      waterLiters: prev.waterLiters + (savedWaterThisTurn / 1000),
-      co2Kg: prev.co2Kg + (savedCo2ThisTurn / 1000),
-    }));
+    // Dynamic savings update (only persistent for actual plays)
+    if (!isSandboxMode) {
+      const savedWaterThisTurn = 50 - result.waterMl;
+      const savedCo2ThisTurn = 0.5 - result.co2Grams;
+      setPersonalSavings((prev) => ({
+        waterMl: prev.waterMl + savedWaterThisTurn,
+        co2Grams: prev.co2Grams + savedCo2ThisTurn,
+      }));
+      setCommunitySavings((prev) => ({
+        waterLiters: prev.waterLiters + (savedWaterThisTurn / 1000),
+        co2Kg: prev.co2Kg + (savedCo2ThisTurn / 1000),
+      }));
+    }
 
     transitionToState("results");
     setTimeout(() => setAnimateScore(true), 100);
@@ -726,6 +821,16 @@ export default function App() {
       onOpenLearn={() => setShowLearnPanel(true)}
       showHint={showHint}
       onToggleHint={() => setShowHint((v) => !v)}
+      onBackToMenu={handleBackToMenu}
+      hasPlayedToday={hasPlayedToday}
+      onStartPlay={() => {
+        setIsSandboxMode(false);
+        setIsPlayingStarted(true);
+        setUserPrompt("");
+        setScore(null);
+        transitionToState("challenge");
+      }}
+      onPlaySandbox={handlePlaySandbox}
     />
   );
 
@@ -749,6 +854,8 @@ export default function App() {
           onOpenLearn={() => setShowLearnPanel(true)}
           personalSavings={personalSavings}
           communitySavings={communitySavings}
+          onPlaySandbox={handlePlaySandbox}
+          onBackToMenu={handleBackToMenu}
         />
         <LearnPanel isOpen={showLearnPanel} onClose={() => setShowLearnPanel(false)} />
       </>
@@ -763,9 +870,166 @@ export default function App() {
       <div style={contentStyle}>
         <div style={{ maxWidth: "500px", margin: "0 auto" }}>
 
-          {isChallengeLoading && <LoadingSkeleton />}
+          {/* Landing View: Play Challenge Button */}
+          {gameState === "challenge" && !isPlayingStarted && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: "calc(100vh - 180px)",
+                textAlign: "center",
+                padding: "24px",
+              }}
+            >
+              {/* Spinning target graphic */}
+              <div
+                style={{
+                  width: "120px",
+                  height: "120px",
+                  borderRadius: "50%",
+                  border: "2px dashed rgba(245, 158, 11, 0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: "32px",
+                  animation: "wave-spin 20s linear infinite",
+                }}
+              >
+                <div
+                  style={{
+                    width: "80px",
+                    height: "80px",
+                    borderRadius: "50%",
+                    border: "2px solid var(--ps-amber)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <span style={{ fontSize: "28px" }}>🎯</span>
+                </div>
+              </div>
 
-          {challenge && (
+              <h1
+                style={{
+                  fontFamily: "Space Grotesk",
+                  fontSize: "32px",
+                  fontWeight: 600,
+                  color: "var(--ps-text-primary)",
+                  marginBottom: "12px",
+                }}
+              >
+                PromptShot
+              </h1>
+              
+              <p
+                style={{
+                  fontSize: "var(--ps-text-body)",
+                  color: "var(--ps-text-secondary)",
+                  maxWidth: "320px",
+                  lineHeight: "1.6",
+                  marginBottom: "32px",
+                }}
+              >
+                Test your prompt engineering reflex. Write precise, one-shot prompts to match target outputs and save environmental resources.
+              </p>
+
+              {hasPlayedToday ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", alignItems: "center" }}>
+                  <button
+                    onClick={handlePlaySandbox}
+                    style={{
+                      width: "100%",
+                      maxWidth: "280px",
+                      height: "52px",
+                      background: "var(--ps-amber)",
+                      color: "#000",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "transform 0.15s ease",
+                      fontFamily: "Space Grotesk",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                  >
+                    Practice in Sandbox Mode
+                  </button>
+                  <button
+                    onClick={() => transitionToState("already-played")}
+                    style={{
+                      width: "100%",
+                      maxWidth: "280px",
+                      height: "52px",
+                      background: "transparent",
+                      color: "var(--ps-text-primary)",
+                      border: "1px solid var(--ps-border)",
+                      borderRadius: "8px",
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      fontFamily: "Space Grotesk",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
+                      e.currentTarget.style.borderColor = "var(--ps-amber)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.borderColor = "var(--ps-border)";
+                    }}
+                  >
+                    View Today's Results
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsSandboxMode(false);
+                    setIsPlayingStarted(true);
+                  }}
+                  style={{
+                    width: "100%",
+                    maxWidth: "280px",
+                    height: "52px",
+                    background: "var(--ps-amber)",
+                    color: "#000",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "transform 0.15s ease",
+                    fontFamily: "Space Grotesk",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                >
+                  Play Today's Challenge
+                </button>
+              )}
+
+              <div
+                style={{
+                  marginTop: "40px",
+                  fontSize: "var(--ps-text-caption)",
+                  color: "var(--ps-text-secondary)",
+                  fontFamily: "var(--ps-font-mono)",
+                }}
+              >
+                💧 ~10ml water per API call · Teal is Eco · Amber is Score
+              </div>
+            </div>
+          )}
+
+          {isPlayingStarted && isChallengeLoading && <LoadingSkeleton />}
+
+          {isPlayingStarted && challenge && (
             <div style={{ background: "var(--ps-surface)", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
               <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
                 <span style={{ background: "var(--ps-teal)", color: "#000", padding: "4px 12px", borderRadius: "9999px", fontSize: "var(--ps-text-caption)", fontWeight: 600 }}>
@@ -789,6 +1053,7 @@ export default function App() {
                   fontFamily: challenge.category === "CODE" ? "var(--ps-font-mono)" : "Space Grotesk",
                   fontSize: "var(--ps-text-secondary-size)",
                   lineHeight: "1.6",
+                  whiteSpace: "pre-wrap",
                 }}
               >
                 {challenge.target_output}
@@ -799,7 +1064,7 @@ export default function App() {
             </div>
           )}
 
-          {gameState === "challenge" && challenge && (
+          {gameState === "challenge" && isPlayingStarted && challenge && (
             <>
               <div style={{ color: "var(--ps-text-secondary)", fontSize: "var(--ps-text-secondary-size)", marginBottom: "8px" }}>
                 Write the prompt that generates this:
@@ -958,33 +1223,94 @@ export default function App() {
                 >
                   <style>{`@keyframes slideUp { from { opacity:0; transform:translateY(40px); } to { opacity:1; transform:translateY(0); } }`}</style>
                   
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ marginBottom: "8px", fontSize: "var(--ps-text-secondary-size)" }}>
-                        This prompt used <span style={{ color: "var(--ps-teal)", fontWeight: 600 }}>1</span> API call
-                      </div>
-                      <div style={{ fontSize: "var(--ps-text-secondary-size)", color: "var(--ps-text-secondary)" }}>
-                        ≈ <span style={{ color: "var(--ps-teal)", fontWeight: 600 }}>{score.waterMl}ml</span> water ({getWaterComparison(score.waterMl)}) · ≈ <span style={{ color: "var(--ps-teal)", fontWeight: 600 }}>{score.co2Grams}g</span> CO₂
-                      </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div
+                      style={{
+                        fontFamily: "Space Grotesk",
+                        fontSize: "18px",
+                        fontWeight: 700,
+                        color: "var(--ps-teal)",
+                        letterSpacing: "0.02em",
+                      }}
+                    >
+                      Did you know? 🌍
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                      <WaterGlass waterMl={score.waterMl} />
-                      <span style={{ fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontWeight: 600 }}>
-                        {score.waterMl}ml
-                      </span>
-                    </div>
-                  </div>
+                    
+                    <p style={{ margin: 0, fontSize: "13px", lineHeight: "1.6", color: "var(--ps-text-primary)" }}>
+                      Every time we ask AI a question, massive computer servers work in the background to generate answers. This process consumes electricity and requires fresh water to cool the hot servers down.
+                    </p>
 
-                  {score.total < 180 && (
-                    <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "16px" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "var(--ps-text-secondary-size)" }}>
-                        A score this low typically means 3+ follow-up prompts to reach this output
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "16px",
+                        background: "rgba(255, 255, 255, 0.03)",
+                        padding: "16px",
+                        borderRadius: "8px",
+                        border: "1px solid rgba(255, 255, 255, 0.05)",
+                        marginTop: "4px",
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "13px", color: "var(--ps-text-primary)", fontWeight: 600, marginBottom: "6px" }}>
+                          Your prompt used:
+                        </div>
+                        <div style={{ fontSize: "14px", color: "var(--ps-teal)", fontWeight: 700 }}>
+                          💧 {score.waterMl}ml of water
+                        </div>
+                        <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", marginTop: "4px" }}>
+                          ({getWaterComparison(score.waterMl)})
+                        </div>
+                        <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", marginTop: "2px" }}>
+                          🌲 ≈ {score.co2Grams.toFixed(2)}g of CO₂ generated
+                        </div>
                       </div>
-                      <div style={{ fontSize: "var(--ps-text-secondary-size)" }}>
-                        That's ≈ 30ml more — <span style={{ color: "var(--ps-amber)", fontWeight: 600 }}>roughly a tablespoon</span>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                        <WaterGlass waterMl={score.waterMl} />
+                        <span style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600 }}>
+                          {score.waterMl}ml
+                        </span>
                       </div>
                     </div>
-                  )}
+
+                    {score.total < 180 ? (
+                      <div
+                        style={{
+                          background: "rgba(245, 158, 11, 0.05)",
+                          borderLeft: "3px solid var(--ps-amber)",
+                          padding: "12px 14px",
+                          borderRadius: "6px",
+                          marginTop: "4px",
+                        }}
+                      >
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--ps-amber)", marginBottom: "4px" }}>
+                          Why a higher score matters:
+                        </div>
+                        <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", lineHeight: "1.5" }}>
+                          A lower accuracy/format score means you would typically need 3+ follow-up corrections. Retrying multiplies your footprint by another tablespoon or more!
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          background: "rgba(20, 184, 166, 0.05)",
+                          borderLeft: "3px solid var(--ps-teal)",
+                          padding: "12px 14px",
+                          borderRadius: "6px",
+                          marginTop: "4px",
+                        }}
+                      >
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--ps-teal)", marginBottom: "4px" }}>
+                          Excellent "One-Shot" Prompt!
+                        </div>
+                        <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", lineHeight: "1.5" }}>
+                          By writing a precise instruction, you got the target output on the first try. This prevented extra retries and saved precious water!
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "16px" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "12px" }}>
@@ -1040,12 +1366,112 @@ export default function App() {
                 </div>
               )}
 
-              <button
-                onClick={handleShare}
-                style={{ width: "100%", height: "48px", background: "var(--ps-amber)", border: "none", color: "#000", borderRadius: "8px", fontSize: "var(--ps-text-secondary-size)", fontWeight: 600, cursor: "pointer" }}
-              >
-                Share result
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", marginTop: "16px" }}>
+                <button
+                  onClick={handleShare}
+                  style={{
+                    width: "100%",
+                    height: "48px",
+                    background: "var(--ps-amber)",
+                    border: "none",
+                    color: "#000",
+                    borderRadius: "8px",
+                    fontSize: "var(--ps-text-secondary-size)",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Share result
+                </button>
+
+                {isSandboxMode ? (
+                  <div style={{ display: "flex", gap: "12px", width: "100%" }}>
+                    <button
+                      onClick={() => {
+                        setUserPrompt("");
+                        setScore(null);
+                        transitionToState("challenge");
+                      }}
+                      style={{
+                        flex: 1,
+                        height: "48px",
+                        background: "transparent",
+                        border: "1px solid var(--ps-border)",
+                        color: "var(--ps-text-primary)",
+                        borderRadius: "8px",
+                        fontSize: "var(--ps-text-secondary-size)",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                        fontFamily: "Space Grotesk",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                        e.currentTarget.style.borderColor = "var(--ps-amber)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.borderColor = "var(--ps-border)";
+                      }}
+                    >
+                      Try Again
+                    </button>
+                    <button
+                      onClick={handleBackToMenu}
+                      style={{
+                        flex: 1,
+                        height: "48px",
+                        background: "transparent",
+                        border: "1px solid var(--ps-border)",
+                        color: "var(--ps-text-primary)",
+                        borderRadius: "8px",
+                        fontSize: "var(--ps-text-secondary-size)",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                        fontFamily: "Space Grotesk",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                        e.currentTarget.style.borderColor = "var(--ps-amber)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.borderColor = "var(--ps-border)";
+                      }}
+                    >
+                      Back to Menu
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => transitionToState("already-played")}
+                    style={{
+                      width: "100%",
+                      height: "48px",
+                      background: "transparent",
+                      border: "1px solid var(--ps-border)",
+                      color: "var(--ps-text-primary)",
+                      borderRadius: "8px",
+                      fontSize: "var(--ps-text-secondary-size)",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      fontFamily: "Space Grotesk",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                      e.currentTarget.style.borderColor = "var(--ps-amber)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.borderColor = "var(--ps-border)";
+                    }}
+                  >
+                    Go to Dashboard
+                  </button>
+                )}
+              </div>
             </>
           )}
         </div>
