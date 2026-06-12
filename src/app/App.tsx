@@ -933,7 +933,7 @@ export default function App() {
                   marginBottom: "32px",
                 }}
               >
-                Test your prompt engineering reflex. Write precise, one-shot prompts to match target outputs and save environmental resources.
+                Can you shoot a perfect prompt? Stop chatting with AI like it's your therapist and get the output in one clean shot. Thirsty data centers are counting on you.
               </p>
 
               {hasPlayedToday ? (
@@ -1020,9 +1020,11 @@ export default function App() {
                   fontSize: "var(--ps-text-caption)",
                   color: "var(--ps-text-secondary)",
                   fontFamily: "var(--ps-font-mono)",
+                  lineHeight: "1.6",
                 }}
               >
-                💧 ~10ml water per API call · Teal is Eco · Amber is Score
+                💡 Fun Fact: Every sloppy, wordy prompt makes an AI server sweat and drink more water.<br />
+                <span style={{ color: "var(--ps-teal)", fontWeight: 600 }}>Teal tracks Eco-savings</span> · <span style={{ color: "var(--ps-amber)", fontWeight: 600 }}>Amber tracks your Score</span>
               </div>
             </div>
           )}
