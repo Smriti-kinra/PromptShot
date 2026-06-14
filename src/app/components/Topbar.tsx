@@ -1,20 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
-
-const C = {
-  bg: "#0B1610",
-  surface: "#121C14",
-  surface2: "#1A2E1C",
-  primary: "#D4E8D4",
-  secondary: "#4A6B4A",
-  mint: "#6EE09B",
-  amber: "var(--ps-amber)",
-  red: "#FF5F5F",
-  border: "#243B27",
-  divider: "#1A2E1C",
-  font: "'Space Grotesk', system-ui, sans-serif",
-  mono: "'JetBrains Mono', monospace",
-};
+import { T } from "../../styles/tokens";
 
 // ── slide panel (used by the nav menu) ────────────────────────────────────────
 
@@ -66,7 +52,7 @@ function SlidePanel({
         zIndex: 200,
         display: "flex",
         justifyContent: from === "left" ? "flex-start" : "flex-end",
-        fontFamily: C.font,
+        fontFamily: T.font,
       }}
     >
       <div
@@ -85,7 +71,7 @@ function SlidePanel({
           width: `${width}px`,
           maxWidth: "100vw",
           height: "100%",
-          background: C.surface,
+          background: T.surface,
           overflowY: "auto",
           transform: visible ? "translateX(0)" : `translateX(${translateOut})`,
           transition: visible ? "transform 300ms ease-out" : "transform 250ms ease-in",
@@ -99,7 +85,7 @@ function SlidePanel({
   );
 }
 
-// ── nav menu (left) — PromptShot 101 + play/sandbox links ─────────────────────
+// ── nav menu (left) — PromptShot 101 + play links ─────────────────────────────
 
 function NavMenu({
   open,
@@ -123,13 +109,13 @@ function NavMenu({
       {/* Header row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-          <span style={{ fontFamily: C.font, fontSize: "16px", fontWeight: 850, color: C.primary, letterSpacing: "-0.04em" }}>Prompt</span>
-          <span style={{ fontFamily: C.font, fontSize: "16px", fontWeight: 300, fontStyle: "italic", color: C.mint, paddingRight: "2px", letterSpacing: "-0.03em" }}>Shot</span>
-          <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.amber, marginRight: "4px", alignSelf: "center", marginTop: "2px" }} />
+          <span style={{ fontFamily: T.font, fontSize: "16px", fontWeight: 850, color: T.primary, letterSpacing: "-0.04em" }}>Prompt</span>
+          <span style={{ fontFamily: T.font, fontSize: "16px", fontWeight: 300, fontStyle: "italic", color: T.mint, paddingRight: "2px", letterSpacing: "-0.03em" }}>Shot</span>
+          <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: T.amber, marginRight: "4px", alignSelf: "center", marginTop: "2px" }} />
         </div>
         <button
           onClick={onClose}
-          style={{ background: "none", border: "none", color: C.secondary, fontSize: "22px", cursor: "pointer", lineHeight: 1, padding: "4px" }}
+          style={{ background: "none", border: "none", color: T.secondary, fontSize: "22px", cursor: "pointer", lineHeight: 1, padding: "4px" }}
         >
           ×
         </button>
@@ -137,7 +123,7 @@ function NavMenu({
 
       {/* User info */}
       <div style={{ marginBottom: "20px" }}>
-        <div style={{ fontSize: "12px", color: C.secondary, fontFamily: C.mono, marginBottom: "4px" }}>
+        <div style={{ fontSize: "12px", color: T.secondary, fontFamily: T.mono, marginBottom: "4px" }}>
           {session ? (
             <span>
               {(session.user.user_metadata?.display_name as string | undefined) ?? session.user.email}
@@ -147,13 +133,13 @@ function NavMenu({
           )}
         </div>
         {streak > 0 && (
-          <div style={{ fontSize: "20px", fontWeight: 700, color: C.primary }}>
+          <div style={{ fontSize: "20px", fontWeight: 700, color: T.primary }}>
             🔥 {streak} day streak
           </div>
         )}
       </div>
 
-      <div style={{ height: "1px", background: C.divider, marginBottom: "20px" }} />
+      <div style={{ height: "1px", background: T.divider, marginBottom: "20px" }} />
 
       {/* PromptShot 101 link */}
       <button
@@ -169,18 +155,18 @@ function NavMenu({
           textAlign: "left",
         }}
       >
-        <span style={{ fontFamily: C.font, fontSize: "14px", fontWeight: 850, color: "var(--ps-text-primary)", letterSpacing: "-0.04em" }}>Prompt</span>
-        <span style={{ fontFamily: C.font, fontSize: "14px", fontWeight: 300, fontStyle: "italic", color: "var(--ps-teal)", paddingRight: "2px", letterSpacing: "-0.03em" }}>Shot</span>
-        <span style={{ width: "3px", height: "3px", borderRadius: "50%", background: "var(--ps-amber)", marginRight: "5px", alignSelf: "center", marginTop: "3px" }} />
-        <span style={{ fontFamily: C.font, fontSize: "14px", fontWeight: 700, color: "var(--ps-text-primary)", marginRight: "4px" }}>101</span>
-        <span style={{ fontFamily: C.font, fontSize: "14px", color: "var(--ps-text-secondary)" }}>›</span>
+        <span style={{ fontFamily: T.font, fontSize: "14px", fontWeight: 850, color: T.primary, letterSpacing: "-0.04em" }}>Prompt</span>
+        <span style={{ fontFamily: T.font, fontSize: "14px", fontWeight: 300, fontStyle: "italic", color: T.teal, paddingRight: "2px", letterSpacing: "-0.03em" }}>Shot</span>
+        <span style={{ width: "3px", height: "3px", borderRadius: "50%", background: T.amber, marginRight: "5px", alignSelf: "center", marginTop: "3px" }} />
+        <span style={{ fontFamily: T.font, fontSize: "14px", fontWeight: 700, color: T.primary, marginRight: "4px" }}>101</span>
+        <span style={{ fontFamily: T.font, fontSize: "14px", color: T.secondary }}>›</span>
       </button>
 
       {/* Play link */}
       {!hasPlayedToday && onStartPlay && (
         <button
           onClick={() => { onClose(); onStartPlay(); }}
-          style={{ background: "none", border: "none", color: C.mint, fontSize: "14px", cursor: "pointer", padding: "10px 0", display: "block", width: "100%", textAlign: "left", fontFamily: C.font, fontWeight: 600 }}
+          style={{ background: "none", border: "none", color: T.mint, fontSize: "14px", cursor: "pointer", padding: "10px 0", display: "block", width: "100%", textAlign: "left", fontFamily: T.font, fontWeight: 600 }}
         >
           Play Today's Challenge ›
         </button>
@@ -226,7 +212,7 @@ export function Topbar({
           background: "none",
           border: "none",
           cursor: "pointer",
-          color: C.secondary,
+          color: T.secondary,
           width: "48px",
           height: "48px",
           display: "flex",
@@ -235,11 +221,11 @@ export function Topbar({
           transition: "color 0.15s, transform 0.15s ease",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.color = C.primary;
+          e.currentTarget.style.color = T.primary;
           e.currentTarget.style.transform = "scale(1.08)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.color = C.secondary;
+          e.currentTarget.style.color = T.secondary;
           e.currentTarget.style.transform = "scale(1)";
         }}
       >
@@ -262,7 +248,7 @@ export function Topbar({
           background: "none",
           border: "none",
           cursor: "pointer",
-          color: C.secondary,
+          color: T.secondary,
           width: "48px",
           height: "48px",
           display: "flex",
@@ -271,11 +257,11 @@ export function Topbar({
           transition: "color 0.15s, transform 0.15s ease",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.color = C.primary;
+          e.currentTarget.style.color = T.primary;
           e.currentTarget.style.transform = "scale(1.08)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.color = C.secondary;
+          e.currentTarget.style.color = T.secondary;
           e.currentTarget.style.transform = "scale(1)";
         }}
       >

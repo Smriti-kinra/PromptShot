@@ -4,6 +4,8 @@ PromptShot is a daily prompt engineering game. Built on a premium, game-focused 
 
 Most developers perform 4–6 iterative chat turns due to vague prompting, with each API call consuming ~10ml of water for cooling and generating carbon emissions. PromptShot turns prompt design into a game, proving that **better prompts = less AI usage = less resource consumption**.
 
+> **Built with Figma Make.** The scoring backend server was scaffolded using [Figma Make](https://www.figma.com/make/), which generated the unique server slug (`make-server-488928a2`) and the initial Hono/Deno edge function structure. The frontend was designed in Figma and exported into the React codebase. The `safeStorage` iframe fallback was specifically engineered to support PromptShot running embedded inside Figma's sandbox preview at `figma.site`.
+
 ---
 
 ## 🌟 Key Features
@@ -56,7 +58,7 @@ Transitions between these states use the browser's native **View Transitions API
 │   ├── hooks/
 │   │   └── useGameState.ts # Game state storage, streak counters, local migrations
 │   ├── lib/
-│   │   ├── safeStorage.ts  # Iframe-safe localStorage memory fallback
+│   │   ├── safeStorage.ts  # Iframe-safe localStorage memory fallback (figma.site compatible)
 │   │   ├── scorer.ts       # Unified API query client (scorePrompt, simulateScore)
 │   │   ├── streak.ts       # Supabase client streak metrics calculator
 │   │   └── supabase.ts     # Supabase DB client and type interfaces
@@ -66,7 +68,7 @@ Transitions between these states use the browser's native **View Transitions API
 └── supabase/
     └── functions/
         └── server/
-            ├── index.tsx   # Dynamic Deno scorer route (Claude 3.5 Sonnet)
+            ├── index.ts    # Deno scorer route on Figma Make server (Claude Haiku via tool-calling)
             └── kv_store.tsx# Database-backed key-value store interface
 ```
 
@@ -102,4 +104,27 @@ supabase functions deploy server
 
 PromptShot supports play by autonomous AI solver agents. Developers can write scripts using the **Google Antigravity SDK** to fetch challenges, score prompts, parse feedback, and iteratively refine prompts in a feedback loop.
 
-See [agents.md](file:///Users/smriti/Documents/GitHub/promptshot/agents.md) for full solver configurations, API contract details, and python solver examples.
+See [agents.md](agents.md) for full solver configurations, API contract details, and python solver examples.
+
+---
+
+## 🎨 Built with Figma Make
+
+The PromptShot backend was scaffolded using **Figma Make**, Figma's AI-powered full-stack code generation tool.
+
+### What Figma Make generated
+- The Hono/Deno edge function server skeleton, including the unique server identifier slug (`make-server-488928a2`) embedded in all API route paths.
+- Initial route scaffolding for the `/score` and `/score-guest` endpoints.
+- The Supabase integration boilerplate (admin client, CORS headers, and Deno environment variable access patterns).
+
+### What was built on top of Figma Make
+After Make scaffolded the server, the following production-grade enhancements were layered in:
+- **Claude Tool Calling** to force structured JSON output from the LLM (eliminating hallucinated formats).
+- **Brevity calculated in code** — not by the LLM — since LLMs are poor at counting characters.
+- **`max_tokens: 100` cap** on the Claude API call, reducing latency and cost by ~5×.
+- **Model downgrade to Claude 3.5 Haiku** from Sonnet, preserving accuracy at a fraction of the cost.
+- **JWT authentication** via `supabase.auth.getUser()` on the authenticated scoring route.
+- **Ideal prompt withholding** from the initial challenge fetch, only returned post-submission to prevent DevTools cheating.
+
+### figma.site Sandbox Compatibility
+The frontend is designed to run embedded as a Figma prototype at `figma.site`. The [`safeStorage.ts`](src/lib/safeStorage.ts) module wraps all `localStorage` access and transparently falls back to an in-memory `MemoryStorage` buffer when the browser sandbox blocks persistent storage — ensuring the game initialises cleanly in Figma's iframe preview without any crashes or console errors.

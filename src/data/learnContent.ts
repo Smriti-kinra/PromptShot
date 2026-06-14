@@ -128,27 +128,27 @@ export const LEARN_CONTENT = {
     {
       id: 'impact',
       title: 'Why efficient prompts matter',
-      subtitle: 'Backed by environmental research (UC Riverside, 2023)',
+      subtitle: 'Based on "Making AI Less Thirsty" — Li et al., UC Riverside (2023). All values are modelled estimates, not exact measurements.',
       items: [
         {
           metric: 'One-shot accuracy',
           point: 'The cleanest environmental win is not needing a second or third attempt.',
-          detail: 'According to UCR research, each query consumes 10-25ml of water for cooling and electricity. Multi-step follow-ups multiply this footprint. A precise first prompt cuts resource consumption by 75% compared to multi-turn chats.'
+          detail: 'The UCR study estimates that a single conversational round (20–50 queries) evaporates roughly 500ml of water for cooling. That implies ~10–25ml per query — so multi-step follow-ups multiply the footprint. Importantly, these are modelled averages: real usage varies significantly by data center, cooling method, and energy grid.'
         },
         {
           metric: 'Constraint density',
           point: 'Useful constraints reduce wandering output.',
-          detail: 'Format, audience, tone, inclusions, and exclusions give the model a smaller target. That means less wasted generation and fewer corrections.'
+          detail: 'Format, audience, tone, inclusions, and exclusions give the model a narrower target. That means less wasted generation, fewer tokens processed, and fewer correction loops — each of which carries an approximate resource cost.'
         },
         {
           metric: 'Right-sized context',
           point: 'Context should be specific, not encyclopedic.',
-          detail: 'The model already has general knowledge. Add the facts it cannot infer: audience, goal, stakes, source material, and what would make the answer unusable.'
+          detail: 'The model already has general knowledge. Add only the facts it cannot infer: audience, goal, source material, and what would make the answer unusable. Every extra sentence in your prompt is extra tokens processed.'
         },
         {
           metric: 'Negative space',
           point: 'Saying what to avoid is often cheaper than cleaning it up later.',
-          detail: 'Negative constraints prevent common failure modes: jargon, sales language, unsafe advice, extra sections, unsupported claims, or code dependencies.'
+          detail: 'Negative constraints prevent common failure modes: jargon, sales language, unsafe advice, extra sections, unsupported claims, or code dependencies. One exclusion clause can prevent two rounds of corrections.'
         }
       ]
     },
@@ -163,7 +163,7 @@ export const LEARN_CONTENT = {
         },
         {
           question: 'Why does brevity matter if the output is accurate?',
-          answer: 'Every word you send to an AI model increases the computational load. Peer-reviewed research by UC Riverside shows that prompt length directly increases server processing time and energy draw. Getting the exact same result with a 40-word prompt instead of 200 words reduces the carbon and water footprint of that transaction by up to 80%.'
+          answer: 'Every word you send to an AI model increases the computational load and thus energy and water usage. The 2023 paper "Making AI Less Thirsty" by Li et al. (UC Riverside) modelled that a conversational round consumes ~500ml of water. While this varies significantly by infrastructure and model, the directional insight holds: shorter, more precise prompts reduce the token workload per query. Achieving the same result with 40 words instead of 200 means less processing — and less resource use.'
         },
         {
           question: 'How does AI actually use water?',
@@ -182,12 +182,16 @@ export const LEARN_CONTENT = {
           answer: 'The shortest sequence of words that produces the target output with no follow-ups needed. It specifies task, format, context, and constraints — but nothing extra. Perfect prompts are rarely discovered on the first try. That\'s why this is a skill, not a trick.'
         },
         {
-          question: 'Where did you get the data/sources for this guidance?',
-          answer: 'Our prompt engineering best practices are synthesized from industry-standard tutorials: Hostinger\'s Prompt Engineering Guide, Lucca Sehn\'s Best Practices (LinkedIn), Kumar H.C.\'s Comprehensive Guide (LinkedIn), Hamza Maqbool\'s 2025 Step-by-Step Roadmap (Medium), and Omnifact\'s Business Prompt Engineering guide. The environmental data is from the University of California, Riverside\'s (UCR) peer-reviewed study "Making AI Less Thirsty" (2023).'
-        },
-        {
           question: 'Can I replay today\'s challenge?',
           answer: 'No — the game is once-per-day by design, like Wordle. This creates the social moment: everyone is working from the same target. A new challenge unlocks at midnight.'
+        },
+        {
+          question: 'Is reverse-engineering a real prompt engineering skill?',
+          answer: 'Yes — and a particularly demanding one. In production, engineers often work backwards from a required output format (a JSON schema, a report template, a test fixture) to a prompt that reliably generates it. PromptShot trains exactly this: given a precise output, can you write the minimal instruction that produces it? This teaches output-first thinking — the same discipline used when writing prompts for structured data extraction, code generation, and content pipelines.'
+        },
+        {
+          question: 'How do BEGINNER, PRO, and EXPERT challenges differ?',
+          answer: 'BEGINNER challenges have short, unambiguous target outputs with clear structural signals — a function definition, a list, a simple paragraph. PRO challenges add multi-constraint targets: specific tone + structure + length simultaneously. EXPERT challenges require the player to infer implicit constraints from the output itself, such as a specific voice, a domain-specific schema, or a precise technical format that isn\'t explicitly described.'
         },
         {
           question: 'Does this help with Generative AI prompt writing or Agentic AI?',

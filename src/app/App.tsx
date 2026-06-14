@@ -12,7 +12,6 @@ import { safeStorage } from "../lib/safeStorage";
 import { loadChallenge } from "../lib/gameUtils";
 
 // ─── screens ──────────────────────────────────────────────────────────────────
-import { ReturnScreen } from "./screens/ReturnScreen";
 import { AlreadyPlayed } from "./screens/AlreadyPlayed";
 import { LandingScreen } from "./screens/LandingScreen";
 import { ChallengeScreen } from "./screens/ChallengeScreen";
@@ -461,6 +460,7 @@ export default function App() {
               animateScore={animateScore}
               showAutoIdeal={showAutoIdeal}
               idealPrompt={idealPrompt}
+              userPrompt={userPrompt}
               personalSavings={personalSavings}
               communitySavings={communitySavings}
               onShare={handleShare}
