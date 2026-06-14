@@ -36,9 +36,10 @@ export function AlreadyPlayed({
         fontFamily: "Space Grotesk, system-ui, sans-serif",
         background: "#0E1E14",
         color: "var(--ps-text-primary)",
-        minHeight: "calc(100vh - 56px)",
+        minHeight: "100vh",
         padding: "24px",
         transition: "background 1.5s ease-in-out",
+        boxSizing: "border-box",
       }}
     >
       <div style={{ maxWidth: "500px", margin: "0 auto" }}>

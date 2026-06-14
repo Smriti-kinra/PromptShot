@@ -212,59 +212,79 @@ export function Topbar({
 }: TopbarProps) {
   const [showNav, setShowNav] = useState(false);
 
-  const iconBtnStyle: React.CSSProperties = {
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    color: C.secondary,
-    width: "56px",
-    height: "56px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "color 0.15s",
-  };
-
   return (
     <>
-      <div
+      {/* Help Icon (Top-Left Corner) */}
+      <button
+        onClick={onOpenLearn}
+        aria-label="Help / Learn"
         style={{
-          position: "sticky",
-          top: 0,
+          position: "absolute",
+          top: "20px",
+          left: "20px",
           zIndex: 50,
-          height: "56px",
-          background: C.bg,
-          borderBottom: `1px solid ${C.border}`,
-          display: "grid",
-          gridTemplateColumns: "56px 1fr 56px",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: C.secondary,
+          width: "48px",
+          height: "48px",
+          display: "flex",
           alignItems: "center",
+          justifyContent: "center",
+          transition: "color 0.15s, transform 0.15s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = C.primary;
+          e.currentTarget.style.transform = "scale(1.08)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = C.secondary;
+          e.currentTarget.style.transform = "scale(1)";
         }}
       >
-        {/* Left — ? help */}
-        <button
-          onClick={onOpenLearn}
-          aria-label="Help / Learn"
-          style={{ ...iconBtnStyle, fontSize: "24px", fontWeight: 700, fontFamily: C.font }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = C.primary)}
-          onMouseLeave={(e) => (e.currentTarget.style.color = C.secondary)}
-        >
-          ?
-        </button>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </button>
 
-        {/* Center — empty */}
-        <div style={{ textAlign: "center" }} />
-
-        {/* Right — Leaderboard (#) */}
-        <button
-          onClick={onOpenLeaderboard}
-          aria-label="Leaderboard"
-          style={{ ...iconBtnStyle, fontSize: "24px", fontWeight: 700, fontFamily: C.font }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = C.primary)}
-          onMouseLeave={(e) => (e.currentTarget.style.color = C.secondary)}
-        >
-          #
-        </button>
-      </div>
+      {/* Leaderboard Icon (Top-Right Corner) */}
+      <button
+        onClick={onOpenLeaderboard}
+        aria-label="Leaderboard"
+        style={{
+          position: "absolute",
+          top: "20px",
+          right: "20px",
+          zIndex: 50,
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: C.secondary,
+          width: "48px",
+          height: "48px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "color 0.15s, transform 0.15s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = C.primary;
+          e.currentTarget.style.transform = "scale(1.08)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = C.secondary;
+          e.currentTarget.style.transform = "scale(1)";
+        }}
+      >
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="10" width="5" height="10" rx="0.5" />
+          <rect x="9.5" y="4" width="5" height="16" rx="0.5" />
+          <rect x="16" y="13" width="5" height="7" rx="0.5" />
+        </svg>
+      </button>
 
       <NavMenu
         open={showNav}

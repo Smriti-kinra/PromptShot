@@ -401,9 +401,10 @@ export default function App() {
     fontFamily: "Space Grotesk, system-ui, sans-serif",
     background: isEcoState ? "#0E1E14" : "var(--ps-background)",
     color: "var(--ps-text-primary)",
-    minHeight: "calc(100vh - 56px)",
+    minHeight: "100vh",
     padding: "24px",
     transition: "background 1.5s ease-in-out",
+    boxSizing: "border-box",
   };
 
   // ── already-played flow ───────────────────────────────────────────────────────
