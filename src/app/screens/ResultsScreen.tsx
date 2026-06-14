@@ -198,15 +198,6 @@ export function ResultsScreen({
         >
           Share result
         </button>
-
-        <button
-          onClick={onBackToMenu}
-          style={{ width: "100%", height: "48px", background: "transparent", border: "1px solid var(--ps-border)", color: "var(--ps-text-primary)", borderRadius: "8px", fontSize: "var(--ps-text-secondary-size)", fontWeight: 600, cursor: "pointer", transition: "all 0.15s ease", fontFamily: "Space Grotesk" }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "var(--ps-amber)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "var(--ps-border)"; }}
-        >
-          Go to Dashboard
-        </button>
       </div>
     </>
   );

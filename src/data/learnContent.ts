@@ -188,6 +188,10 @@ export const LEARN_CONTENT = {
         {
           question: 'Can I replay today\'s challenge?',
           answer: 'No — the game is once-per-day by design, like Wordle. This creates the social moment: everyone is working from the same target. A new challenge unlocks at midnight.'
+        },
+        {
+          question: 'Does this help with Generative AI prompt writing or Agentic AI?',
+          answer: 'PromptShot is designed specifically for Generative AI prompt writing (prompt engineering). It teaches you how to write clear, high-quality instructions to get the exact output you want on the first attempt (one-shot). It is not for Agentic AI (which involves building autonomous agent loops), though mastering precise prompt writing is also a core skill needed to instruct agents effectively.'
         }
       ]
     }
