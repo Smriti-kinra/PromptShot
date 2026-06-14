@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import confetti from "canvas-confetti";
 import type { ScoreResult } from "../lib/scorer";
 import type { Challenge } from "../lib/supabase";
@@ -27,6 +28,15 @@ const SCORE_BAR_TOOLTIPS = {
   Format: "Evaluates whether your prompt correctly enforces structural constraints, length limits, styling, and output type (20 pts).",
   Brevity: "Measures green efficiency: token economy (15 pts) and latency/speed of execution (15 pts).",
 };
+
+// ── Shared stagger helper ─────────────────────────────────────────────────────
+function fadeUp(delay = 0) {
+  return {
+    initial: { opacity: 0, y: 18 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay },
+  };
+}
 
 // ── Per-dimension coaching ────────────────────────────────────────────────────
 function getScoreFeedback(
@@ -118,12 +128,10 @@ export function ResultsScreen({
     { label: "Format", value: score.format, max: 20, tooltip: SCORE_BAR_TOOLTIPS.Format, r: 60 },
     { label: "Brevity", value: score.brevity, max: 30, tooltip: SCORE_BAR_TOOLTIPS.Brevity, r: 35 },
   ];
-  // calculation modal removed; comparison shown inline
   const [playRings, setPlayRings] = useState(false);
   const [didYouKnowOpen, setDidYouKnowOpen] = useState(false);
 
   useEffect(() => {
-    // trigger ring animations shortly after mount when `animateScore` is true
     if (animateScore) {
       const t = setTimeout(() => setPlayRings(true), 80);
       return () => clearTimeout(t);
@@ -131,53 +139,37 @@ export function ResultsScreen({
       setPlayRings(false);
     }
   }, [animateScore, score.total]);
+
   useEffect(() => {
     if (animateScore && score.total >= 80) {
       const duration = 1.5 * 1000;
       const end = Date.now() + duration;
-
       const frame = () => {
-        confetti({
-          particleCount: 3,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0 },
-          colors: ["#F59E0B", "#14B8A6", "#6EE09B"]
-        });
-        confetti({
-          particleCount: 3,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1 },
-          colors: ["#F59E0B", "#14B8A6", "#6EE09B"]
-        });
-
-        if (Date.now() < end) {
-          requestAnimationFrame(frame);
-        }
+        confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors: ["#F59E0B", "#14B8A6", "#6EE09B"] });
+        confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors: ["#F59E0B", "#14B8A6", "#6EE09B"] });
+        if (Date.now() < end) requestAnimationFrame(frame);
       };
-      
       frame();
     }
   }, [animateScore, score.total]);
 
   return (
     <>
-      {/* Wordmark / Logo on top */}
-      <div style={{ marginBottom: "18px", textAlign: "center" }}>
+      {/* ── Wordmark ── */}
+      <motion.div {...fadeUp(0)} style={{ marginBottom: "18px", textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6 }}>
           <span style={{ fontFamily: T.font, fontSize: 20, fontWeight: 800, color: T.primary, letterSpacing: "-0.02em" }}>Prompt</span>
           <span style={{ fontFamily: T.font, fontSize: 20, fontWeight: 300, fontStyle: "italic", color: T.mint, paddingRight: "2px" }}>Shot</span>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, marginLeft: 6 }} />
         </div>
-      </div>
-      {/* Bullseye rings SVG */}
-      <div style={{ textAlign: "center", marginBottom: "32px" }}>
+      </motion.div>
+
+      {/* ── Bullseye rings ── */}
+      <motion.div {...fadeUp(0.05)} style={{ textAlign: "center", marginBottom: "32px" }}>
         <svg width="200" height="200" viewBox="0 0 200 200" style={{ margin: "0 auto" }}>
           {bars.map(({ label, value, max, r }, i) => {
             const circumference = 2 * Math.PI * r;
             const targetOffset = circumference * (1 - value / max);
-            const initialOffset = circumference; // hide initially
             return (
               <g key={label}>
                 <circle cx="100" cy="100" r={r} fill="none" stroke="#222" strokeWidth="12" />
@@ -185,9 +177,9 @@ export function ResultsScreen({
                   cx="100" cy="100" r={r}
                   fill="none" stroke="var(--ps-amber)" strokeWidth="12"
                   strokeDasharray={`${circumference}`}
-                  strokeDashoffset={playRings ? `${targetOffset}` : `${initialOffset}`}
+                  strokeDashoffset={playRings ? `${targetOffset}` : `${circumference}`}
                   transform="rotate(-90 100 100)"
-                  style={{ transition: `stroke-dashoffset 0.8s ease-out ${i * 0.18}s` }}
+                  style={{ transition: `stroke-dashoffset 0.9s cubic-bezier(0.22, 1, 0.36, 1) ${i * 0.2}s` }}
                 >
                   <title>{label}: {value}/{max}</title>
                 </circle>
@@ -197,186 +189,223 @@ export function ResultsScreen({
           <text x="100" y="95" textAnchor="middle" fill="var(--ps-text-primary)" fontSize="40" fontWeight="600">{score.total}</text>
           <text x="100" y="115" textAnchor="middle" fill="var(--ps-text-secondary)" fontSize="20">/100</text>
         </svg>
-        <div style={{ fontSize: "var(--ps-text-subhead)", color: "var(--ps-amber)", marginTop: "16px", fontWeight: 600 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          style={{ fontSize: "var(--ps-text-subhead)", color: "var(--ps-amber)", marginTop: "16px", fontWeight: 600 }}
+        >
           {getScoreLabel(score.total)}
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      {/* Score bars */}
-      <div style={{ marginBottom: "24px" }}>
-        {bars.map((item) => (
-          <div key={item.label} className="ps-tooltip-container" style={{ marginBottom: "12px" }}>
+      {/* ── Score bars ── */}
+      <motion.div {...fadeUp(0.15)} style={{ marginBottom: "24px" }}>
+        {bars.map((item, idx) => (
+          <motion.div
+            key={item.label}
+            className="ps-tooltip-container"
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 + idx * 0.08, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            style={{ marginBottom: "12px" }}
+          >
             <div className="ps-tooltip-text">{item.tooltip}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "var(--ps-text-secondary-size)" }}>
               <span style={{ color: "var(--ps-text-secondary)" }}>{item.label} ⓘ</span>
               <span style={{ color: "var(--ps-text-primary)" }}>{item.value}/{item.max}</span>
             </div>
             <div style={{ height: "4px", background: "#222", borderRadius: "9999px", overflow: "hidden" }}>
-              <div style={{ width: `${(item.value / item.max) * 100}%`, height: "100%", background: "var(--ps-amber)", transition: animateScore ? "width 0.6s ease-out" : "none" }} />
+              <div style={{ width: `${(item.value / item.max) * 100}%`, height: "100%", background: "var(--ps-amber)", transition: animateScore ? "width 0.8s cubic-bezier(0.22, 1, 0.36, 1)" : "none" }} />
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
-      
-
-      {/* Impact card */}
-      {gameState === "impact" && (
-        <div
-          className="ps-glass-panel"
-          style={{
-            background: "rgba(20, 184, 166, 0.04)",
-            borderLeft: "4px solid var(--ps-teal)",
-            borderColor: "rgba(20, 184, 166, 0.15)",
-            padding: "24px",
-            marginBottom: "24px",
-            animation: "slideUp 0.6s ease-out forwards",
-            display: "flex",
-            flexDirection: "column",
-            gap: "16px",
-          }}
-        >
-          <style>{`@keyframes slideUp { from { opacity:0; transform:translateY(40px); } to { opacity:1; transform:translateY(0); } }`}</style>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
-              onClick={() => setDidYouKnowOpen(d => !d)}
-            >
-              <div style={{ fontFamily: "var(--ps-font-ui)", fontSize: "18px", fontWeight: 700, color: "var(--ps-teal)", letterSpacing: "0.02em" }}>
-                Did you know? 🌍
-              </div>
-              <span style={{ color: "var(--ps-text-secondary)", fontSize: "13px", transition: "transform 0.2s", display: "inline-block", transform: didYouKnowOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
-            </div>
-
-            {didYouKnowOpen && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
-                {/* ── Horizontal glass comparison ─────────────────────────────── */}
-                {idealPrompt ? (() => {
-                  const ideal = mockScore(idealPrompt, (challenge && (challenge as any).target_output) || "");
-                  const diff = score.waterMl - ideal.waterMl;
-                  const saved = Math.abs(diff);
-                  const isOver  = diff > 0;
-                  const isEqual = diff === 0;
-
-                  const diffReason = isEqual
-                    ? "Your prompt was as efficient as the ideal — great job!"
-                    : isOver
-                    ? `Your prompt used ${saved}ml more because it needed more tokens to interpret — shorter, clearer phrasing reduces AI compute.`
-                    : `Your prompt was even more efficient than ideal, saving ${saved}ml by using fewer tokens.`;
-
-                  return (
-                    <>
-                      {/* Glasses side-by-side */}
-                      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "32px", background: "rgba(255,255,255,0.03)", padding: "16px 12px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                          <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>Ideal</div>
-                          <WaterGlass waterMl={ideal.waterMl} />
-                          <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{ideal.waterMl}ml</div>
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: "20px", gap: 4 }}>
-                          <div style={{ fontSize: "18px", color: isEqual ? "var(--ps-teal)" : isOver ? "var(--ps-amber)" : "var(--ps-teal)" }}>
-                            {isEqual ? "=" : isOver ? "↑" : "↓"}
-                          </div>
-                          <div style={{ fontSize: "11px", color: isEqual ? "var(--ps-teal)" : isOver ? "var(--ps-amber)" : "var(--ps-teal)", fontFamily: "var(--ps-font-mono)", fontWeight: 700 }}>
-                            {isEqual ? "same" : `${isOver ? "+" : "-"}${saved}ml`}
-                          </div>
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                          <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>You</div>
-                          <WaterGlass waterMl={score.waterMl} />
-                          <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{score.waterMl}ml</div>
-                        </div>
-                      </div>
-
-                      {/* Concise reason */}
-                      <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", lineHeight: "1.55", padding: "0 2px" }}>
-                        {diffReason}
-                      </div>
-                    </>
-                  );
-                })() : (
-                  <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)" }}>No ideal prompt available for this challenge.</div>
-                )}
-
-                <div style={{ fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontStyle: "italic" }}>
-                  Better prompts = less AI = less water.
+      {/* ── Impact card ── */}
+      <AnimatePresence>
+        {gameState === "impact" && (
+          <motion.div
+            key="impact-card"
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="ps-glass-panel"
+            style={{
+              background: "rgba(20, 184, 166, 0.04)",
+              borderLeft: "4px solid var(--ps-teal)",
+              borderColor: "rgba(20, 184, 166, 0.15)",
+              padding: "24px",
+              marginBottom: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+                onClick={() => setDidYouKnowOpen(d => !d)}
+              >
+                <div style={{ fontFamily: "var(--ps-font-ui)", fontSize: "18px", fontWeight: 700, color: "var(--ps-teal)", letterSpacing: "0.02em" }}>
+                  Did you know? 🌍
                 </div>
+                <span style={{
+                  color: "var(--ps-text-secondary)", fontSize: "13px",
+                  display: "inline-block",
+                  transform: didYouKnowOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
+                }}>▾</span>
               </div>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* Calculation modal removed — inline comparison shown in the card above */}
+              <AnimatePresence>
+                {didYouKnowOpen && (
+                  <motion.div
+                    key="dyk-body"
+                    initial={{ opacity: 0, height: 0, y: -8 }}
+                    animate={{ opacity: 1, height: "auto", y: 0 }}
+                    exit={{ opacity: 0, height: 0, y: -8 }}
+                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
+                      {idealPrompt ? (() => {
+                        const ideal = mockScore(idealPrompt, (challenge && (challenge as any).target_output) || "");
+                        const diff = score.waterMl - ideal.waterMl;
+                        const saved = Math.abs(diff);
+                        const isOver  = diff > 0;
+                        const isEqual = diff === 0;
+                        const diffReason = isEqual
+                          ? "Your prompt was as efficient as the ideal — great job!"
+                          : isOver
+                          ? `Your prompt used ${saved}ml more because it needed more tokens to interpret — shorter, clearer phrasing reduces AI compute.`
+                          : `Your prompt was even more efficient than ideal, saving ${saved}ml by using fewer tokens.`;
+                        return (
+                          <>
+                            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "32px", background: "rgba(255,255,255,0.03)", padding: "16px 12px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                                <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>Ideal</div>
+                                <WaterGlass waterMl={ideal.waterMl} />
+                                <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{ideal.waterMl}ml</div>
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: "20px", gap: 4 }}>
+                                <div style={{ fontSize: "18px", color: isEqual ? "var(--ps-teal)" : isOver ? "var(--ps-amber)" : "var(--ps-teal)" }}>
+                                  {isEqual ? "=" : isOver ? "↑" : "↓"}
+                                </div>
+                                <div style={{ fontSize: "11px", color: isEqual ? "var(--ps-teal)" : isOver ? "var(--ps-amber)" : "var(--ps-teal)", fontFamily: "var(--ps-font-mono)", fontWeight: 700 }}>
+                                  {isEqual ? "same" : `${isOver ? "+" : "-"}${saved}ml`}
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                                <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>You</div>
+                                <WaterGlass waterMl={score.waterMl} />
+                                <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{score.waterMl}ml</div>
+                              </div>
+                            </div>
+                            <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", lineHeight: "1.55", padding: "0 2px" }}>
+                              {diffReason}
+                            </div>
+                          </>
+                        );
+                      })() : (
+                        <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)" }}>No ideal prompt available for this challenge.</div>
+                      )}
+                      <div style={{ fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontStyle: "italic" }}>
+                        Better prompts = less AI = less water.
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Challenge question (after Did you know) */}
+      {/* ── Challenge question ── */}
       {challenge && (
-        <div style={{ marginBottom: "18px", textAlign: "center" }}>
+        <motion.div {...fadeUp(0.25)} style={{ marginBottom: "18px", textAlign: "center" }}>
           <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", marginBottom: "6px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>
             Challenge
           </div>
           <div style={{ background: "#141414", borderLeft: "4px solid var(--ps-border)", borderRadius: "8px", padding: "12px", fontFamily: "var(--ps-font-mono)", fontSize: "14px", color: "var(--ps-text-primary)", lineHeight: "1.5" }}>
             {challenge.target_output}
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* Per-dimension coaching feedback (critical review) */}
+      {/* ── Per-dimension coaching feedback ── */}
       {(() => {
         const fb = getScoreFeedback(score.accuracy, score.format, score.brevity);
         const allGood = fb.dim === "All";
         const accentColor = allGood ? "var(--ps-teal)" : "var(--ps-amber)";
         const borderColor = allGood ? "var(--ps-teal)" : "var(--ps-amber)";
         return (
-          <div className={allGood ? "ps-glass-panel" : "ps-glass-panel-amber"} style={{ borderLeft: `4px solid ${borderColor}`, padding: "16px 20px", marginBottom: "24px", borderRadius: "12px" }}>
+          <motion.div
+            {...fadeUp(0.32)}
+            className={allGood ? "ps-glass-panel" : "ps-glass-panel-amber"}
+            style={{ borderLeft: `4px solid ${borderColor}`, padding: "16px 20px", marginBottom: "24px", borderRadius: "12px" }}
+          >
             <div style={{ fontSize: "var(--ps-text-caption)", fontWeight: 700, color: accentColor, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>
               {allGood ? "✓" : "→"} {fb.label}
             </div>
             <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)", lineHeight: "1.55" }}>
               {fb.tip}
             </div>
-          </div>
+          </motion.div>
         );
       })()}
 
-      {/* Ideal prompt reveal — with word diff */}
-      {showAutoIdeal && idealPrompt && (
-        <div style={{ marginBottom: "24px", animation: "slideUp 0.4s ease-out" }}>
-          
-          {userPrompt.trim() ? (
-            <PromptDiff userPrompt={userPrompt} idealPrompt={idealPrompt} />
-          ) : (
-            <div
-              style={{
-                background: "#141414",
-                borderLeft: "4px solid var(--ps-teal)",
-                borderRadius: "8px",
-                padding: "16px",
-                fontFamily: "var(--ps-font-mono)",
-                fontSize: "14px",
-                color: "var(--ps-text-primary)",
-                lineHeight: "1.6",
-              }}
-            >
-              {idealPrompt}
-            </div>
-          )}
-        </div>
-      )}
+      {/* ── Ideal prompt reveal ── */}
+      <AnimatePresence>
+        {showAutoIdeal && idealPrompt && (
+          <motion.div
+            key="ideal-diff"
+            initial={{ opacity: 0, y: 20, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            style={{ marginBottom: "24px" }}
+          >
+            {userPrompt.trim() ? (
+              <PromptDiff userPrompt={userPrompt} idealPrompt={idealPrompt} />
+            ) : (
+              <div
+                style={{
+                  background: "#141414",
+                  borderLeft: "4px solid var(--ps-teal)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  fontFamily: "var(--ps-font-mono)",
+                  fontSize: "14px",
+                  color: "var(--ps-text-primary)",
+                  lineHeight: "1.6",
+                }}
+              >
+                {idealPrompt}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Action buttons */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", marginTop: "16px" }}>
+      {/* ── Action buttons ── */}
+      <motion.div {...fadeUp(0.4)} style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", marginTop: "16px" }}>
         <button
           onClick={onShare}
-          style={{ width: "100%", height: "48px", background: "var(--ps-amber)", border: "none", color: "#000", borderRadius: "8px", fontSize: "var(--ps-text-secondary-size)", fontWeight: 600, cursor: "pointer" }}
+          style={{
+            width: "100%", height: "48px",
+            background: "var(--ps-amber)", border: "none", color: "#000",
+            borderRadius: "8px", fontSize: "var(--ps-text-secondary-size)", fontWeight: 600, cursor: "pointer",
+            transition: "transform 0.18s cubic-bezier(0.22,1,0.36,1), opacity 0.18s ease",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.02)")}
+          onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
         >
           Share result
         </button>
-      </div>
+      </motion.div>
     </>
   );
 }

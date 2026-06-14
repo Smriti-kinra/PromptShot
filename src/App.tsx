@@ -434,17 +434,27 @@ export default function App() {
       <AnimatedGridBackground />
       {topbar}
       <div style={contentStyle}>
+        {/* Outer border shell — wider than the content to create breathing room */}
+        <div style={{
+          maxWidth: "680px",
+          margin: "0 auto",
+          border: "1px solid var(--ps-border)",
+          borderRadius: "20px",
+          padding: "24px",
+          boxSizing: "border-box",
+        }}>
+        {/* Inner content — same 500px as before */}
         <div style={{ maxWidth: "500px", margin: "0 auto" }}>
 
           <AnimatePresence mode="wait">
-            {/* Initializing check */}
+            {/* Initializing */}
             {isInitializing && (
               <motion.div
                 key="initializing"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -471,14 +481,14 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* Landing: no active play session */}
+            {/* Landing */}
             {!isInitializing && gameState === "challenge" && !isPlayingStarted && (
               <motion.div
                 key="landing"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
+                initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -16, scale: 1.01 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               >
                 <LandingScreen
                   difficulty={difficulty}
@@ -493,10 +503,10 @@ export default function App() {
             {!isInitializing && gameState === "already-played" && (
               <motion.div
                 key="already-played"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
+                initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -16, scale: 1.01 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               >
                 <AlreadyPlayed
                   score={score}
@@ -513,10 +523,10 @@ export default function App() {
             {!isInitializing && isPlayingStarted && (gameState === "challenge" || gameState === "loading") && (
               <motion.div
                 key="challenge"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
+                initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -16, scale: 1.01 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               >
                 <ChallengeScreen
                   challenge={challenge}
@@ -534,10 +544,10 @@ export default function App() {
             {!isInitializing && (gameState === "results" || gameState === "impact") && score && (
               <motion.div
                 key="results"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
+                initial={{ opacity: 0, y: 32, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -16, scale: 1.01 }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
                 <ResultsScreen
                   score={score}
@@ -556,6 +566,7 @@ export default function App() {
             )}
           </AnimatePresence>
 
+        </div>
         </div>
       </div>
       {modals}

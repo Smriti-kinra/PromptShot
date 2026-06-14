@@ -10,6 +10,35 @@ export interface ScoreResult {
   feedback?: string;
 }
 
+/** Hard-clamp every score field so API over-scoring never leaks into the UI */
+function clampScore(raw: {
+  accuracy: number;
+  format: number;
+  brevity: number;
+  total: number;
+  waterMl: number;
+  co2Grams: number;
+  idealPrompt?: string;
+  justification?: string;
+  feedback?: string;
+}): ScoreResult {
+  const accuracy = Math.min(50,  Math.max(0, Math.round(raw.accuracy)));
+  const format   = Math.min(20,  Math.max(0, Math.round(raw.format)));
+  const brevity  = Math.min(30,  Math.max(0, Math.round(raw.brevity)));
+  const total    = Math.min(100, Math.max(0, accuracy + format + brevity));
+  return {
+    accuracy,
+    format,
+    brevity,
+    total,
+    waterMl:  Math.max(1,    raw.waterMl),
+    co2Grams: Math.max(0.01, raw.co2Grams),
+    idealPrompt:   raw.idealPrompt,
+    justification: raw.justification,
+    feedback:      raw.feedback,
+  };
+}
+
 const EDGE_URL =
   "https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2/score";
 
@@ -108,7 +137,7 @@ export async function scorePrompt(
   });
   if (!res.ok) throw new Error(`Score request failed: ${res.status}`);
   const data = await res.json();
-  return {
+  return clampScore({
     accuracy: data.accuracy,
     format: data.format,
     brevity: data.brevity,
@@ -118,7 +147,7 @@ export async function scorePrompt(
     idealPrompt: data.idealPrompt,
     justification: data.justification,
     feedback: data.feedback,
-  };
+  });
 }
 
 export async function simulateScore(
@@ -138,7 +167,7 @@ export async function simulateScore(
   ]);
 
   if (res && typeof res.accuracy === "number") {
-    return {
+    return clampScore({
       accuracy: res.accuracy,
       format: res.format,
       brevity: res.brevity,
@@ -148,7 +177,7 @@ export async function simulateScore(
       idealPrompt: res.idealPrompt,
       justification: res.justification,
       feedback: res.feedback,
-    };
+    });
   }
   return mockScore(userPrompt, targetOutput);
 }
