@@ -239,75 +239,74 @@ export function ResultsScreen({
           <style>{`@keyframes slideUp { from { opacity:0; transform:translateY(40px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", cursor: "pointer" }} onClick={() => setDidYouKnowOpen(d => !d)}>
+            <div
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+              onClick={() => setDidYouKnowOpen(d => !d)}
+            >
               <div style={{ fontFamily: "var(--ps-font-ui)", fontSize: "18px", fontWeight: 700, color: "var(--ps-teal)", letterSpacing: "0.02em" }}>
                 Did you know? 🌍
               </div>
+              <span style={{ color: "var(--ps-text-secondary)", fontSize: "13px", transition: "transform 0.2s", display: "inline-block", transform: didYouKnowOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
             </div>
-            {/* Motivation paragraph moved to FAQ */}
 
             {didYouKnowOpen && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", background: "rgba(255,255,255,0.03)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)", marginTop: "4px" }}>
-                  <div style={{ flex: 1 }}>
-                    {idealPrompt ? (
-                      (() => {
-                        const ideal = mockScore(idealPrompt, (challenge && (challenge as any).target_output) || "");
-                        const diff = score.waterMl - ideal.waterMl;
-                        const diffSign = diff >= 0 ? "+" : "-";
-                        const absDiff = Math.abs(diff);
-                        return (
-                          <div>
-                            <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)", marginBottom: 6 }}>Ideal prompt would use approximately:</div>
-                            <div style={{ fontSize: "14px", color: "var(--ps-teal)", fontWeight: 700 }}>💧 ~{ideal.waterMl}ml</div>
-                            <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", marginTop: 8 }}>Your prompt used: <span style={{ color: "var(--ps-teal)", fontWeight: 700 }}>~{score.waterMl}ml</span></div>
-                            <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", marginTop: 8 }}>Difference: <span style={{ color: "var(--ps-amber)", fontWeight: 700 }}>{diffSign}{absDiff}ml</span></div>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)" }}>No ideal prompt available for this challenge.</div>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: 120 }}>
-                    {idealPrompt ? (
-                      (() => {
-                        const ideal = mockScore(idealPrompt, (challenge && (challenge as any).target_output) || "");
-                        return (
-                          <>
-                            <div style={{ textAlign: "center" }}>
-                              <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", marginBottom: 6 }}>Ideal</div>
-                              <WaterGlass waterMl={ideal.waterMl} />
-                              <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600 }}>~{ideal.waterMl}ml</div>
-                            </div>
-                            <div style={{ height: 8 }} />
-                            <div style={{ textAlign: "center" }}>
-                              <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", marginBottom: 6 }}>You</div>
-                              <WaterGlass waterMl={score.waterMl} />
-                              <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600 }}>~{score.waterMl}ml</div>
-                            </div>
-                          </>
-                        );
-                      })()
-                    ) : (
-                      <div style={{ textAlign: "center" }}>
-                        <WaterGlass waterMl={score.waterMl} />
-                        <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600 }}>~{score.waterMl}ml</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
-                <div style={{ fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontStyle: "italic", marginTop: "8px" }}>
+                {/* ── Horizontal glass comparison ─────────────────────────────── */}
+                {idealPrompt ? (() => {
+                  const ideal = mockScore(idealPrompt, (challenge && (challenge as any).target_output) || "");
+                  const diff = score.waterMl - ideal.waterMl;
+                  const saved = Math.abs(diff);
+                  const isOver  = diff > 0;
+                  const isEqual = diff === 0;
+
+                  const diffReason = isEqual
+                    ? "Your prompt was as efficient as the ideal — great job!"
+                    : isOver
+                    ? `Your prompt used ${saved}ml more because it needed more tokens to interpret — shorter, clearer phrasing reduces AI compute.`
+                    : `Your prompt was even more efficient than ideal, saving ${saved}ml by using fewer tokens.`;
+
+                  return (
+                    <>
+                      {/* Glasses side-by-side */}
+                      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "32px", background: "rgba(255,255,255,0.03)", padding: "16px 12px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                          <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>Ideal</div>
+                          <WaterGlass waterMl={ideal.waterMl} />
+                          <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{ideal.waterMl}ml</div>
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: "20px", gap: 4 }}>
+                          <div style={{ fontSize: "18px", color: isEqual ? "var(--ps-teal)" : isOver ? "var(--ps-amber)" : "var(--ps-teal)" }}>
+                            {isEqual ? "=" : isOver ? "↑" : "↓"}
+                          </div>
+                          <div style={{ fontSize: "11px", color: isEqual ? "var(--ps-teal)" : isOver ? "var(--ps-amber)" : "var(--ps-teal)", fontFamily: "var(--ps-font-mono)", fontWeight: 700 }}>
+                            {isEqual ? "same" : `${isOver ? "+" : "-"}${saved}ml`}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                          <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>You</div>
+                          <WaterGlass waterMl={score.waterMl} />
+                          <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{score.waterMl}ml</div>
+                        </div>
+                      </div>
+
+                      {/* Concise reason */}
+                      <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", lineHeight: "1.55", padding: "0 2px" }}>
+                        {diffReason}
+                      </div>
+                    </>
+                  );
+                })() : (
+                  <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)" }}>No ideal prompt available for this challenge.</div>
+                )}
+
+                <div style={{ fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontStyle: "italic" }}>
                   Better prompts = less AI = less water.
                 </div>
               </div>
             )}
-          </div>
-
-          {/* lifetime/community savings removed; concise footer */}
-          <div style={{ fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontStyle: "italic", marginTop: "8px" }}>
-            Better prompts = less AI = less water.
           </div>
         </div>
       )}

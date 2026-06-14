@@ -1,7 +1,6 @@
 import React from "react";
 import { useCountdownToMidnight } from "../hooks/useCountdownToMidnight";
 import { soundManager } from "../lib/sounds";
-import { useEffect, useState } from "react";
 
 interface AdmireScreenProps {
   onAdmire: () => void;
@@ -9,12 +8,6 @@ interface AdmireScreenProps {
 
 export function AdmireScreen({ onAdmire }: AdmireScreenProps) {
   const { h, m, s } = useCountdownToMidnight();
-  const [playRings, setPlayRings] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setPlayRings(true), 80);
-    return () => clearTimeout(t);
-  }, []);
 
   return (
     <div
@@ -37,34 +30,16 @@ export function AdmireScreen({ onAdmire }: AdmireScreenProps) {
             style={{ animation: "ripple-expand 4.5s ease-out infinite", transformOrigin: "80px 80px" }}
           />
           <g style={{ animation: "target-wobble 4.5s ease-out infinite", transformOrigin: "80px 80px" }}>
-            {/* animated rings using stroke-dashoffset to match ResultsScreen */}
-            {([56, 42, 28] as const).map((r, i) => {
-              const circumference = 2 * Math.PI * r;
-              const initialOffset = circumference;
-              const targetOffset = 0;
-              const stroke = i === 0 ? "rgba(20,184,166,0.08)" : i === 1 ? "var(--ps-teal)" : "var(--ps-text-primary)";
-              const strokeWidth = i === 1 ? 3 : 1.5;
-              const dash = i === 0 ? "6 4" : i === 2 ? "4 3" : undefined;
-              return (
-                <g key={r}>
-                  <circle cx="80" cy="80" r={r} fill="none" stroke="transparent" strokeWidth={strokeWidth} />
-                  <circle
-                    cx="80" cy="80"
-                    r={r}
-                    fill="none"
-                    stroke={stroke}
-                    strokeWidth={strokeWidth}
-                    strokeDasharray={`${circumference}`}
-                    strokeDashoffset={playRings ? `${targetOffset}` : `${initialOffset}`}
-                    transform="rotate(-90 80 80)"
-                    style={{ transition: `stroke-dashoffset 0.8s ease-out ${i * 0.14}s` }}
-                  />
-                  {dash && <circle cx="80" cy="80" r={r} fill="none" stroke="transparent" strokeDasharray={dash as any} />}
-                </g>
-              );
-            })}
+            <circle cx="80" cy="80" r="56" fill="none" stroke="rgba(20, 184, 166, 0.15)" strokeWidth="1.5" strokeDasharray="6 4" />
+            <circle cx="80" cy="80" r="42" fill="none" stroke="var(--ps-teal)" strokeWidth="3" />
+            <circle cx="80" cy="80" r="28" fill="none" stroke="var(--ps-text-primary)" strokeWidth="1.5" strokeDasharray="4 3" />
             <circle cx="80" cy="80" r="14" fill="var(--ps-amber)" />
             <circle cx="80" cy="80" r="5" fill="#000" />
+          </g>
+          <g id="arrow-group" style={{ animation: "arrow-shoot 4.5s infinite", transformOrigin: "0px 0px" }}>
+            <line x1="-32" y1="0" x2="-2" y2="0" stroke="var(--ps-text-primary)" strokeWidth="2" strokeLinecap="round" />
+            <path d="M -32 -5 L -24 0 L -32 5 L -37 5 L -30 0 L -37 -5 Z" fill="var(--ps-teal)" />
+            <polygon points="0,0 -8,-4 -6,0 -8,4" fill="var(--ps-amber)" />
           </g>
         </svg>
       </div>

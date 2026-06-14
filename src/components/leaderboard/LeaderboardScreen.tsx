@@ -181,21 +181,35 @@ export function LeaderboardScreen({ session, onClose, openCount }: LeaderboardSc
         return;
       }
 
+      // Fetch display names from profiles table for all players in this batch
+      const userIds = [...new Set(data.map((r) => r.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", userIds);
+
+      const nameMap = new Map<string, string>();
+      (profiles ?? []).forEach((p) => {
+        if (p.display_name) nameMap.set(p.id, p.display_name);
+      });
+
+      // Fallback: ensure current user's name is always shown correctly
+      const currentUserName =
+        (session.user.user_metadata?.display_name as string | undefined) ??
+        nameMap.get(session.user.id) ??
+        session.user.email?.split("@")[0] ??
+        "you";
+      nameMap.set(session.user.id, currentUserName);
+
       const mapped: LeaderboardEntry[] = data.map((row, i) => {
         const isCurrentUser = row.user_id === session.user.id;
-        // Use display_name from user_metadata for the current user
-        const currentUserName =
-          (session.user.user_metadata?.display_name as string | undefined) ??
-          session.user.email?.split("@")[0] ??
-          "you";
-        const emailPrefix = isCurrentUser
-          ? currentUserName
-          : `player_${row.user_id.slice(0, 6)}`;
+        const displayName =
+          nameMap.get(row.user_id) ?? `player_${row.user_id.slice(0, 6)}`;
 
         return {
           rank: i + 1,
           userId: row.user_id,
-          displayName: emailPrefix,
+          displayName,
           total: row.total,
           accuracy: row.accuracy,
           format: row.format,
