@@ -293,23 +293,46 @@ export function ResultsScreen({
                   >
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
                       {idealPrompt ? (() => {
-                        const ideal = mockScore(idealPrompt, (challenge && (challenge as any).target_output) || "");
-                        const diff = score.waterMl - ideal.waterMl;
+                        const targetOutput = challenge?.target_output || (challenge as any)?.targetOutput || "";
+                        const isFallback = score.justification?.toLowerCase().includes("fallback") || score.justification?.toLowerCase().includes("simulation");
+                        const idealEstTokens = isFallback
+                          ? Math.round(idealPrompt.length / 4) + 100
+                          : 300 + Math.round(idealPrompt.length / 4) + Math.round(targetOutput.length / 4);
+                        const idealWaterMl = Math.max(1, Math.round(idealEstTokens * 0.033));
+
+                        const diff = score.waterMl - idealWaterMl;
                         const saved = Math.abs(diff);
                         const isOver  = diff > 0;
                         const isEqual = diff === 0;
-                        const diffReason = isEqual
-                          ? "Your prompt was as efficient as the ideal — great job!"
-                          : isOver
-                          ? `Your prompt used ${saved}ml more because it needed more tokens to interpret — shorter, clearer phrasing reduces AI compute.`
-                          : `Your prompt was even more efficient than ideal, saving ${saved}ml by using fewer tokens.`;
+
+                        let diffReason = "";
+                        if (score.total >= 95) {
+                          diffReason = `Your prompt performed on par with the ideal benchmark, matching its efficiency and accuracy with ${score.waterMl}ml of water.`;
+                        } else {
+                          const accLost = 50 - score.accuracy;
+                          const fmtLost = 20 - score.format;
+                          const breLost = 30 - score.brevity;
+
+                          if (breLost >= accLost && breLost >= fmtLost) {
+                            if (isOver) {
+                              diffReason = `While the ideal prompt was highly concise, your prompt was longer and less token-efficient (Brevity: 30/30 vs. ${score.brevity}/30), using ${saved}ml more water.`;
+                            } else {
+                              diffReason = `While the ideal prompt was highly concise, your prompt used fewer tokens to process, saving ${saved}ml of water but scoring lower on overall brevity (Brevity: 30/30 vs. ${score.brevity}/30).`;
+                            }
+                          } else if (accLost >= fmtLost) {
+                            diffReason = `While the ideal prompt captured all semantic details in one shot, your prompt was less precise (Accuracy: 50/50 vs. ${score.accuracy}/50), meaning you would need multiple follow-up prompts to reach the target.`;
+                          } else {
+                            diffReason = `While the ideal prompt perfectly locked in the output shape, your prompt was less structurally precise (Format: 20/20 vs. ${score.format}/20), which requires formatting retries.`;
+                          }
+                        }
+
                         return (
                           <>
                             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "32px", background: "rgba(255,255,255,0.03)", padding: "16px 12px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                                 <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>Ideal</div>
-                                <WaterGlass waterMl={ideal.waterMl} />
-                                <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{ideal.waterMl}ml</div>
+                                <WaterGlass waterMl={idealWaterMl} />
+                                <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{idealWaterMl}ml</div>
                               </div>
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: "20px", gap: 4 }}>
                                 <div style={{ fontSize: "18px", color: isEqual ? "var(--ps-teal)" : isOver ? "var(--ps-amber)" : "var(--ps-teal)" }}>

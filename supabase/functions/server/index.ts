@@ -101,6 +101,7 @@ CRITICAL SAFETY DIRECTIVES:
     body: JSON.stringify({
       model: CLAUDE_MODEL,
       max_tokens: 1000,
+      temperature: 0.1,
       system: systemPrompt,
       messages: [
         {
@@ -146,10 +147,10 @@ GENERAL GRADING PHILOSOPHY (apply this to every criterion below):
 
 Evaluate across three criteria:
 
-1. Semantic Similarity (0-40) — does the meaning, facts, and intent match?
-   - 36-40: Conveys essentially the same message, with the same specific details (names, numbers, key facts, claims) and a matching tone.
-   - 26-35: Same core message and most key details present, but 1-2 specific facts are missing/altered, or tone is noticeably off.
-   - 11-25: Recognizably the same topic, but multiple key facts are missing, invented, or wrong, and/or the tone is substantially different.
+1. Semantic Similarity (0-40) — does the meaning, facts, intent, tone, and completeness match? (Evaluate meaning and completeness only — do not perform keyword or verbatim matching here).
+   - 36-40: Conveys essentially the same message, with the same details and a matching tone.
+   - 26-35: Same core message and most key details present, but 1-2 details are missing/altered, or tone is noticeably off.
+   - 11-25: Recognizably the same topic, but multiple details are missing, invented, or wrong, and/or the tone is substantially different.
    - 0-10: Different meaning, generic boilerplate that could apply to many prompts, contradicts the target, or barely overlaps with it.
 
 2. Structural Match (0-20) — does the layout/format match?
@@ -158,26 +159,27 @@ Evaluate across three criteria:
    - 1-9: Wrong format category entirely (e.g., prose where the target is a list or code block, or vice versa), even if the content is related.
    - 0: No discernible structure, or structure is entirely unrelated to the target.
 
-3. Keyword/Key-syntax Match (0-10) — are mandatory terms/phrases/identifiers present?
-   - Identify the specific terms, names, numbers, function/variable names, or required exact phrases in the target.
-   - Award points proportionally to how many of these literally appear in the player output.
-   - A close synonym does NOT count unless it is the exact term used in the target — this game rewards precision, not paraphrase.
-   - 9-10: Nearly all mandatory terms present verbatim.
-   - 4-8: Roughly half present.
-   - 0-3: Few or none present.
+3. Specificity Match (0–10): Does the output contain the SPECIFIC identifiers, numbers,
+   proper nouns, or technical terms that make this target unique (e.g. "invoice #1042",
+   "15% of the staff", "end of day today", "by Friday", "debug day")?
+   A close synonym or paraphrase does NOT count — only verbatim matches.
+   General topic words present in both (e.g. "calendar", "meeting", "email") score 0 here.
+   9–10: Nearly all unique identifiers present.
+   4–8:  Roughly half present.
+   0–3:  Few or none present.
 
 CRITICAL EXECUTION RULES:
-- If the player's generated text is completely unrelated to the target text, is absurd, refuses the task, is empty/near-empty, or has zero contextual overlap, you MUST award exactly 0 points across all three criteria (Semantic Similarity = 0, Structural Match = 0, Keyword/Key-syntax Match = 0).
+- If the player's generated text is completely unrelated to the target text, is absurd, refuses the task, is empty/near-empty, or has zero contextual overlap, you MUST award exactly 0 points across all three criteria (Semantic Similarity = 0, Structural Match = 0, Specificity Match = 0).
 - Be completely objective and strict. When a deduction is plausible, take it. Small formatting, factual, or phrasing deviations should lose points — do not round up.
 - If you are torn between two adjacent score bands for a criterion, choose the lower band.
 - "justification" must name SPECIFIC differences (e.g., "target uses a numbered list with 5 items, player output is a single paragraph" or "target specifies the deadline as Friday; player output omits any deadline") — generic praise or generic criticism is not acceptable.
-- Return your evaluation ONLY as a valid, raw JSON object. Do not wrap it in markdown code blocks (no \`\`\`json). Do not add conversational text.
+- Return your evaluation ONLY as a valid, raw JSON object. Do not wrap it in markdown code blocks (no ```json). Do not add conversational text.
 
 Expected JSON Schema Output:
 {
   "semantic_score": <integer, 0-40>,
   "structural_score": <integer, 0-20>,
-  "keyword_score": <integer, 0-10>,
+  "specificity_score": <integer, 0-10>,
   "accuracy_subtotal": <integer, 0-70, sum of the three scores above>,
   "justification": "<string, a direct 1-2 sentence technical explanation citing SPECIFIC mismatches or matches that justify the scores>",
   "player_feedback": "<string, a friendly, encouraging 1-sentence tip on how they could tweak their prompting strategy next time to hit the target more precisely>"
@@ -216,16 +218,7 @@ ${playerOutput}`
   const data = await response.json();
   const text = data.content?.[0]?.text || "{}";
   
-  let cleanedText = text.trim();
-  if (cleanedText.startsWith("```json")) {
-    cleanedText = cleanedText.substring(7);
-  } else if (cleanedText.startsWith("```")) {
-    cleanedText = cleanedText.substring(3);
-  }
-  if (cleanedText.endsWith("```")) {
-    cleanedText = cleanedText.substring(0, cleanedText.length - 3);
-  }
-  cleanedText = cleanedText.trim();
+  const cleanedText = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 
   try {
     return JSON.parse(cleanedText);
@@ -235,7 +228,7 @@ ${playerOutput}`
   }
 }
 
-async function callClaudeScorer(userPrompt: string, targetOutput: string, idealPrompt: string) {
+async function callClaudeScorer(userPrompt: string, targetOutput: string, idealPrompt: string, difficulty: string = "BEGINNER") {
   const sandbox = await runSandbox(userPrompt);
   
   let judgeResult;
@@ -257,18 +250,24 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
   }
 
   const idealTokens = Math.max(15, Math.round(idealPrompt.length / 4));
-  const userTokens = sandbox.promptTokens;
-  const token_efficiency = Math.max(0, 15 - Math.round(Math.max(0, userTokens - idealTokens) / 3));
+  const IDEAL_TOKEN_CEILING: Record<string, number> = {
+    BEGINNER: 40,   // ~160 chars
+    PRO:      55,   // ~220 chars
+    EXPERT:   70,   // ~280 chars
+  };
 
-  const latencySec = sandbox.latencyMs / 1000;
-  const speed_efficiency = Math.max(0, 15 - Math.round(Math.max(0, latencySec - 1.5) * 2));
+  const ceiling = IDEAL_TOKEN_CEILING[difficulty?.toUpperCase() ?? "BEGINNER"] ?? 55;
+  const idealTokensClamped = Math.min(ceiling, idealTokens);
+
+  const userTokens  = Math.max(1,  Math.round(userPrompt.length / 4));
+  const token_efficiency = Math.max(0, 15 - Math.round(Math.max(0, userTokens - idealTokensClamped) / 3));
 
   const semantic = Math.max(0, Math.min(40, judgeResult.semantic_score ?? 0));
-  const keyword = Math.max(0, Math.min(10, judgeResult.keyword_score ?? 0));
+  const keyword = Math.max(0, Math.min(10, judgeResult.specificity_score ?? judgeResult.keyword_score ?? 0));
   const mappedAccuracy = semantic + keyword;
 
   const rawFormat = Math.max(0, Math.min(20, judgeResult.structural_score ?? 0));
-  const rawBrevity = token_efficiency + speed_efficiency;
+  const rawBrevity = Math.min(30, token_efficiency * 2);
 
   // Scale format and brevity by accuracy ratio (out of 50)
   const accuracyRatio = mappedAccuracy / 50;
@@ -276,6 +275,15 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
   const mappedBrevity = Math.round(rawBrevity * accuracyRatio);
 
   const total = mappedAccuracy + mappedFormat + mappedBrevity;
+
+  const DIFFICULTY_MULTIPLIER: Record<string, number> = {
+    BEGINNER: 1.0,
+    PRO:      1.15,
+    EXPERT:   1.30,
+  };
+
+  const multiplier = DIFFICULTY_MULTIPLIER[difficulty?.toUpperCase() ?? "BEGINNER"] ?? 1.0;
+  const adjustedTotal = Math.min(100, Math.round(total * multiplier));
 
   const { waterMl, co2Grams } = estimateResources({ input_tokens: sandbox.promptTokens, output_tokens: sandbox.completionTokens });
 
@@ -288,7 +296,7 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
     accuracy: mappedAccuracy,
     format: mappedFormat,
     brevity: mappedBrevity,
-    total,
+    total: adjustedTotal,
     waterMl,
     co2Grams,
     justification,
@@ -296,7 +304,17 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
   };
 }
 
-function fallbackScore(userPrompt: string, targetOutput: string = "") {
+function jaccardSimilarity(a: string, b: string): number {
+  const setA = new Set(a.toLowerCase().match(/\b\w{4,}\b/g) ?? []);
+  const setB = new Set(b.toLowerCase().match(/\b\w{4,}\b/g) ?? []);
+  if (setA.size === 0 || setB.size === 0) return 0;
+  let intersection = 0;
+  for (const w of setA) { if (setB.has(w)) intersection++; }
+  const union = new Set([...setA, ...setB]).size;
+  return intersection / union;
+}
+
+function fallbackScore(userPrompt: string, targetOutput: string = "", difficulty: string = "BEGINNER") {
   const cleanPrompt = userPrompt.trim();
   if (cleanPrompt.length < 10 || ["hi", "hello", "test", "hey", "prompt"].includes(cleanPrompt.toLowerCase())) {
     return {
@@ -339,16 +357,26 @@ function fallbackScore(userPrompt: string, targetOutput: string = "") {
 
   const rawBrevity = cleanPrompt.length < 80 ? 30 : cleanPrompt.length < 150 ? 20 : 10;
   
-  const hasVerbs = /\b(write|create|generate|explain|list|describe|act|role|format|output|show)\b/i.test(cleanPrompt);
-  
-  const accuracy = hasVerbs ? (25 + Math.floor(Math.random() * 15)) : (5 + Math.floor(Math.random() * 10));
-  const rawFormat = hasVerbs ? (10 + Math.floor(Math.random() * 8)) : (2 + Math.floor(Math.random() * 6));
+  const sim = jaccardSimilarity(userPrompt, targetOutput);
+  const hasVerbs = /\b(write|create|generate|explain|list|describe|act|role|format|output|show)\b/i.test(userPrompt.trim());
+
+  const accuracy    = Math.round(sim * 40 + (hasVerbs ? 5 : 0));   // 0–45, capped at 50
+  const rawFormat   = Math.round(sim * 16 + (hasVerbs ? 2 : 0));   // 0–18, capped at 20
   
   // Scale format and brevity by accuracy ratio
   const accuracyRatio = accuracy / 50;
   const format = Math.round(rawFormat * accuracyRatio);
   const brevity = Math.round(rawBrevity * accuracyRatio);
   const total = accuracy + format + brevity;
+
+  const DIFFICULTY_MULTIPLIER: Record<string, number> = {
+    BEGINNER: 1.0,
+    PRO:      1.15,
+    EXPERT:   1.30,
+  };
+
+  const multiplier = DIFFICULTY_MULTIPLIER[difficulty?.toUpperCase() ?? "BEGINNER"] ?? 1.0;
+  const adjustedTotal = Math.min(100, Math.round(total * multiplier));
   
   // Calculate mock resources dynamically based on prompt length
   const totalEstTokens = Math.round(cleanPrompt.length / 4) + 100;
@@ -358,11 +386,11 @@ function fallbackScore(userPrompt: string, targetOutput: string = "") {
     accuracy,
     format,
     brevity,
-    total,
+    total: adjustedTotal,
     waterMl,
     co2Grams,
     justification: "Busy server fallback grading applied.",
-    feedback: "Focus on adding clear instructions and output structure directives."
+    feedback: "Focus on adding clean instructions and output structure directives."
   };
 }
 
@@ -371,7 +399,7 @@ app.post("/make-server-488928a2/score", async (c) => {
     const authHeader = c.req.header("Authorization");
     await verifyUser(authHeader);
 
-    const { challengeId, userPrompt } = await c.req.json();
+    const { challengeId, userPrompt, difficulty } = await c.req.json();
     if (!challengeId || !userPrompt) {
       return c.json({ error: "Missing fields" }, 400);
     }
@@ -393,7 +421,7 @@ app.post("/make-server-488928a2/score", async (c) => {
     }
 
     const challenge = await getChallengeFromDb(challengeId);
-    const scoreResult = await callClaudeScorer(userPrompt, challenge.target_output, challenge.ideal_prompt);
+    const scoreResult = await callClaudeScorer(userPrompt, challenge.target_output, challenge.ideal_prompt, difficulty ?? "BEGINNER");
 
     return c.json({
       ...scoreResult,
@@ -404,7 +432,7 @@ app.post("/make-server-488928a2/score", async (c) => {
     if (err.message?.includes("Unauthorized")) {
       return c.json({ error: err.message }, 401);
     }
-    const { challengeId, userPrompt } = await c.req.json().catch(() => ({}));
+    const { challengeId, userPrompt, difficulty } = await c.req.json().catch(() => ({}));
     let idealPrompt = "";
     let targetOutput = "";
     if (challengeId) {
@@ -415,7 +443,7 @@ app.post("/make-server-488928a2/score", async (c) => {
       }
     }
     return c.json({
-      ...fallbackScore(userPrompt || "", targetOutput),
+      ...fallbackScore(userPrompt || "", targetOutput, difficulty ?? "BEGINNER"),
       idealPrompt,
       debugError: err.message || String(err),
     });
@@ -424,7 +452,7 @@ app.post("/make-server-488928a2/score", async (c) => {
 
 app.post("/make-server-488928a2/score-guest", async (c) => {
   try {
-    const { challengeId, userPrompt } = await c.req.json();
+    const { challengeId, userPrompt, difficulty } = await c.req.json();
     if (!challengeId || !userPrompt) {
       return c.json({ error: "Missing fields" }, 400);
     }
@@ -446,7 +474,7 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
     }
 
     const challenge = await getChallengeFromDb(challengeId);
-    const scoreResult = await callClaudeScorer(userPrompt, challenge.target_output, challenge.ideal_prompt);
+    const scoreResult = await callClaudeScorer(userPrompt, challenge.target_output, challenge.ideal_prompt, difficulty ?? "BEGINNER");
 
     return c.json({
       ...scoreResult,
@@ -454,7 +482,7 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
     });
   } catch (err) {
     console.error("Scoring error (guest route):", err);
-    const { challengeId, userPrompt } = await c.req.json().catch(() => ({}));
+    const { challengeId, userPrompt, difficulty } = await c.req.json().catch(() => ({}));
     let idealPrompt = "";
     let targetOutput = "";
     if (challengeId) {
@@ -465,7 +493,7 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
       }
     }
     return c.json({
-      ...fallbackScore(userPrompt || "", targetOutput),
+      ...fallbackScore(userPrompt || "", targetOutput, difficulty ?? "BEGINNER"),
       idealPrompt,
       debugError: err instanceof Error ? err.message : String(err),
     });

@@ -45,7 +45,17 @@ const EDGE_URL =
 const GUEST_SCORE_URL =
   "https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2/score-guest";
 
-export function mockScore(userPrompt: string, targetOutput: string = ""): ScoreResult {
+function jaccardSimilarity(a: string, b: string): number {
+  const setA = new Set(a.toLowerCase().match(/\b\w{4,}\b/g) ?? []);
+  const setB = new Set(b.toLowerCase().match(/\b\w{4,}\b/g) ?? []);
+  if (setA.size === 0 || setB.size === 0) return 0;
+  let intersection = 0;
+  for (const w of setA) { if (setB.has(w)) intersection++; }
+  const union = new Set([...setA, ...setB]).size;
+  return intersection / union;
+}
+
+export function mockScore(userPrompt: string, targetOutput: string = "", difficulty: string = "BEGINNER"): ScoreResult {
   const cleanPrompt = userPrompt.trim();
   if (cleanPrompt.length < 10 || ["hi", "hello", "test", "hey", "prompt"].includes(cleanPrompt.toLowerCase())) {
     return {
@@ -88,20 +98,27 @@ export function mockScore(userPrompt: string, targetOutput: string = ""): ScoreR
 
   const len = cleanPrompt.length;
   const rawBrevity = len < 80 ? 25 : len < 150 ? 18 : 10;
-  const hasStructure = /\b(write|create|generate|explain|list|describe|act|role|format|output|show)\b/i.test(cleanPrompt);
   
-  const accuracy = Math.round(
-    hasStructure ? 30 + Math.random() * 15 : 5 + Math.random() * 10
-  );
-  const rawFormat = Math.round(
-    hasStructure ? 10 + Math.random() * 8 : 2 + Math.random() * 5
-  );
+  const sim = jaccardSimilarity(userPrompt, targetOutput);
+  const hasVerbs = /\b(write|create|generate|explain|list|describe|act|role|format|output|show)\b/i.test(userPrompt.trim());
+
+  const accuracy    = Math.round(sim * 40 + (hasVerbs ? 5 : 0));   // 0–45, capped at 50
+  const rawFormat   = Math.round(sim * 16 + (hasVerbs ? 2 : 0));   // 0–18, capped at 20
   
   // Dependency scaling
   const accuracyRatio = accuracy / 50;
   const format = Math.round(rawFormat * accuracyRatio);
   const brevity = Math.round(rawBrevity * accuracyRatio);
   const total = accuracy + format + brevity;
+
+  const DIFFICULTY_MULTIPLIER: Record<string, number> = {
+    BEGINNER: 1.0,
+    PRO:      1.15,
+    EXPERT:   1.30,
+  };
+
+  const multiplier = DIFFICULTY_MULTIPLIER[difficulty?.toUpperCase() ?? "BEGINNER"] ?? 1.0;
+  const adjustedTotal = Math.min(100, Math.round(total * multiplier));
 
   const totalEstTokens = Math.round(len / 4) + 100;
   const waterMl = Math.max(1, Math.round(totalEstTokens * 0.033));
@@ -111,7 +128,7 @@ export function mockScore(userPrompt: string, targetOutput: string = ""): ScoreR
     accuracy,
     format,
     brevity,
-    total,
+    total: adjustedTotal,
     waterMl,
     co2Grams,
     justification: "Programmatic evaluation simulation applied.",
@@ -123,6 +140,7 @@ export async function scorePrompt(
   userPrompt: string,
   challengeId: string | number,
   accessToken: string,
+  difficulty: string = "BEGINNER",
 ): Promise<ScoreResult> {
   const res = await fetch(EDGE_URL, {
     method: "POST",
@@ -133,6 +151,7 @@ export async function scorePrompt(
     body: JSON.stringify({
       userPrompt,
       challengeId,
+      difficulty,
     }),
   });
   if (!res.ok) throw new Error(`Score request failed: ${res.status}`);
@@ -154,12 +173,13 @@ export async function simulateScore(
   userPrompt: string,
   challengeId: string | number,
   targetOutput: string = "",
+  difficulty: string = "BEGINNER",
 ): Promise<ScoreResult> {
   const [res] = await Promise.all([
     fetch(GUEST_SCORE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userPrompt, challengeId }),
+      body: JSON.stringify({ userPrompt, challengeId, difficulty }),
     })
       .then((r) => r.json())
       .catch(() => null),
@@ -179,5 +199,5 @@ export async function simulateScore(
       feedback: res.feedback,
     });
   }
-  return mockScore(userPrompt, targetOutput);
+  return mockScore(userPrompt, targetOutput, difficulty);
 }

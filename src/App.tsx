@@ -451,10 +451,10 @@ export default function App() {
 
     if (session) {
       try {
-        result = await scorePrompt(userPrompt, challenge.id, session.access_token);
+        result = await scorePrompt(userPrompt, challenge.id, session.access_token, difficulty);
       } catch (err) {
         console.error("Scoring error, using local fallback:", err);
-        result = mockScore(userPrompt);
+        result = mockScore(userPrompt, challenge.target_output || (challenge as any).targetOutput, difficulty);
       }
 
       const today = new Date().toISOString().split("T")[0];
@@ -475,7 +475,7 @@ export default function App() {
       const newStreak = await calculateAndUpdateStreak(session.user.id);
       setStreak(newStreak);
     } else {
-      result = await simulateScore(userPrompt, challenge.id, challenge.target_output || (challenge as any).targetOutput);
+      result = await simulateScore(userPrompt, challenge.id, challenge.target_output || (challenge as any).targetOutput, difficulty);
 
       const today = new Date().toISOString().split("T")[0];
       saveLocalScore({
