@@ -2,6 +2,7 @@ import type { Challenge } from "../lib/supabase";
 import { getBrevityColor } from "../lib/gameUtils";
 import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { soundManager } from "../lib/sounds";
+import { Wordmark } from "../components/Wordmark";
 
 interface ChallengeScreenProps {
   challenge: Challenge | null;
@@ -50,14 +51,7 @@ export function ChallengeScreen({
         ‹ Back to Home Menu
       </button>
 
-      {/* Wordmark */}
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-          <span style={{ fontFamily: "Space Grotesk", fontSize: "22px", fontWeight: 850, letterSpacing: "-0.04em", color: "var(--ps-text-primary)" }}>Prompt</span>
-          <span style={{ fontFamily: "Space Grotesk", fontSize: "22px", fontWeight: 300, fontStyle: "italic", letterSpacing: "-0.03em", color: "var(--ps-teal)", paddingRight: "4px" }}>Shot</span>
-          <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "var(--ps-amber)", alignSelf: "flex-end", marginBottom: "5px" }} />
-        </div>
-      </div>
+      <Wordmark size="md" style={{ marginBottom: "20px" }} />
 
       {isLoading && <LoadingSkeleton />}
 
@@ -69,7 +63,7 @@ export function ChallengeScreen({
               {challenge.difficulty}
             </span>
           </div>
-          <div style={{ color: "var(--ps-text-secondary)", fontSize: "var(--ps-text-secondary-size)", marginBottom: "8px" }}>
+          <div style={{ color: "var(--ps-text-primary)", fontSize: "16px", fontWeight: 700, marginBottom: "8px", fontFamily: "var(--ps-font-ui)" }}>
             Today's target output
           </div>
           <div
@@ -97,7 +91,7 @@ export function ChallengeScreen({
       {/* Prompt input */}
       {gameState === "challenge" && challenge && (
         <>
-          <div style={{ color: "var(--ps-text-secondary)", fontSize: "var(--ps-text-secondary-size)", marginBottom: "8px" }}>
+          <div style={{ color: "var(--ps-text-primary)", fontSize: "16px", fontWeight: 700, marginBottom: "8px", fontFamily: "var(--ps-font-ui)" }}>
             Write the prompt that generates this:
           </div>
           <textarea

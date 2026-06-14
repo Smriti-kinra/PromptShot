@@ -35,7 +35,7 @@ export function LeaderboardModal({ isOpen, onClose, session, openCount = 0 }: Le
 
   if (!rendered) return null;
 
-  const title = session ? "🏆 Today's Leaderboard" : "🏆 Leaderboard";
+  const titleText = session ? "Today's Leaderboard" : "Leaderboard";
 
   return (
     <div
@@ -82,8 +82,19 @@ export function LeaderboardModal({ isOpen, onClose, session, openCount = 0 }: Le
             fontWeight: 700,
             color: C.primary,
             fontFamily: C.font,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}>
-            {title}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ps-amber)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M6 3.5h12l-1 7.5a5 5 0 0 1-5 4.5 5 5 0 0 1-5-4.5L6 3.5z" />
+              <path d="M6 5C3.5 5 2.5 7 3.5 10.5" />
+              <path d="M18 5C20.5 5 21.5 7 20.5 10.5" />
+              <path d="M11 15.5c0 2-.8 3.5-1.5 5" />
+              <path d="M13 15.5c0 2 .8 3.5 1.5 5" />
+              <rect x="7" y="20.5" width="10" height="2.5" rx="1" />
+            </svg>
+            <span>{titleText}</span>
           </div>
           <button
             onClick={onClose}

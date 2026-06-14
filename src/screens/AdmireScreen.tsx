@@ -1,6 +1,7 @@
 import React from "react";
 import { useCountdownToMidnight } from "../hooks/useCountdownToMidnight";
 import { soundManager } from "../lib/sounds";
+import { Wordmark } from "../components/Wordmark";
 
 interface AdmireScreenProps {
   onAdmire: () => void;
@@ -21,9 +22,9 @@ export function AdmireScreen({ onAdmire }: AdmireScreenProps) {
         padding: "24px",
       }}
     >
-      <div style={{ width: "160px", height: "160px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
         {/* small target svg like landing */}
-        <svg width="160" height="160" viewBox="0 0 160 160" style={{ overflow: "visible" }}>
+        <svg className="ps-target-svg" viewBox="0 0 160 160" style={{ overflow: "visible" }}>
           <circle
             cx="80" cy="80" r="14"
             fill="none" stroke="var(--ps-amber)"
@@ -44,11 +45,7 @@ export function AdmireScreen({ onAdmire }: AdmireScreenProps) {
         </svg>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "2px", justifyContent: "center", marginBottom: "12px" }}>
-        <span style={{ fontFamily: "Space Grotesk", fontSize: "36px", fontWeight: 800, letterSpacing: "-0.04em", color: "var(--ps-text-primary)" }}>Prompt</span>
-        <span style={{ fontFamily: "Space Grotesk", fontSize: "36px", fontWeight: 400, fontStyle: "italic", letterSpacing: "-0.03em", color: "var(--ps-teal)", paddingRight: "6px" }}>Shot</span>
-        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--ps-amber)", alignSelf: "flex-end", marginBottom: "8px" }} />
-      </div>
+      <Wordmark size="lg" style={{ marginBottom: "12px" }} />
 
       <div style={{ 
         display: "inline-flex", 

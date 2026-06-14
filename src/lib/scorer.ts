@@ -107,7 +107,7 @@ export function mockScore(userPrompt: string, targetOutput: string = ""): ScoreR
   const waterMl = Math.max(1, Math.round(totalEstTokens * 0.033));
   const co2Grams = Math.max(0.01, parseFloat((totalEstTokens * 0.00033).toFixed(3)));
 
-  return {
+  return clampScore({
     accuracy,
     format,
     brevity,
@@ -116,7 +116,7 @@ export function mockScore(userPrompt: string, targetOutput: string = ""): ScoreR
     co2Grams,
     justification: "Programmatic evaluation simulation applied.",
     feedback: "Focus on adding clear instructions and output structure directives.",
-  };
+  });
 }
 
 export async function scorePrompt(

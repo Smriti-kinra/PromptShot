@@ -12,7 +12,7 @@ export function getScoreLabel(total: number): string {
 }
 
 export function getBrevityColor(length: number): string {
-  if (length < 80) return "#14B8A6";
+  if (length < 80) return "var(--ps-teal)";
   if (length < 150) return "#F59E0B";
   return "#EF4444";
 }

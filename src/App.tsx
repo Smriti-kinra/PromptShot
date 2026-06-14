@@ -63,6 +63,43 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
 
+  // Expose reset database utility to window object for developer/admin reset requests
+  useEffect(() => {
+    (window as any).resetDatabase = async () => {
+      console.log("[PromptShot] Resetting local and database data...");
+      
+      // 1. Clear local storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // 2. Clear supabase data if logged in
+      try {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession?.user) {
+          // Delete scores using Supabase JS client
+          await supabase
+            .from("scores")
+            .delete()
+            .eq("user_id", activeSession.user.id);
+
+          // Reset profile streak
+          await supabase
+            .from("profiles")
+            .update({ streak: 0, last_played: null })
+            .eq("id", activeSession.user.id);
+        }
+        
+        // Log out
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error("Error resetting data in Supabase:", err);
+      }
+      
+      // 3. Reload page
+      window.location.reload();
+    };
+  }, []);
+
   const {
     gameState,
     setGameState,
@@ -227,26 +264,32 @@ export default function App() {
           .single();
 
         if (existingScore) {
+          const acc = Math.min(50,  Math.max(0, existingScore.accuracy ?? 0));
+          const fmt = Math.min(20,  Math.max(0, existingScore.format   ?? 0));
+          const bre = Math.min(30,  Math.max(0, existingScore.brevity  ?? 0));
           setScore({
-            accuracy: existingScore.accuracy,
-            format: existingScore.format,
-            brevity: existingScore.brevity,
-            total: existingScore.total,
-            waterMl: existingScore.water_ml ?? 10,
-            co2Grams: existingScore.co2_grams ?? 0.1,
+            accuracy: acc,
+            format:   fmt,
+            brevity:  bre,
+            total:    Math.min(100, acc + fmt + bre),
+            waterMl:  Math.max(1,    existingScore.water_ml  ?? 10),
+            co2Grams: Math.max(0.01, existingScore.co2_grams ?? 0.1),
           });
           if (existingScore.user_prompt) setUserPrompt(existingScore.user_prompt);
         }
       } else {
         const todayEntry = getLocalHistory().find((s) => s.played_at === today);
         if (todayEntry) {
+          const acc = Math.min(50,  Math.max(0, todayEntry.accuracy ?? 0));
+          const fmt = Math.min(20,  Math.max(0, todayEntry.format   ?? 0));
+          const bre = Math.min(30,  Math.max(0, todayEntry.brevity  ?? 0));
           setScore({
-            accuracy: todayEntry.accuracy,
-            format: todayEntry.format,
-            brevity: todayEntry.brevity,
-            total: todayEntry.total,
-            waterMl: todayEntry.waterMl ?? 10,
-            co2Grams: todayEntry.co2Grams ?? 0.1,
+            accuracy: acc,
+            format:   fmt,
+            brevity:  bre,
+            total:    Math.min(100, acc + fmt + bre),
+            waterMl:  Math.max(1,    todayEntry.waterMl  ?? 10),
+            co2Grams: Math.max(0.01, todayEntry.co2Grams ?? 0.1),
           });
           if (todayEntry.user_prompt) setUserPrompt(todayEntry.user_prompt);
         }
@@ -434,17 +477,7 @@ export default function App() {
       <AnimatedGridBackground />
       {topbar}
       <div style={contentStyle}>
-        {/* Outer border shell — wider than the content to create breathing room */}
-        <div style={{
-          maxWidth: "680px",
-          margin: "0 auto",
-          border: "1px solid var(--ps-border)",
-          borderRadius: "20px",
-          padding: "24px",
-          boxSizing: "border-box",
-        }}>
-        {/* Inner content — same 500px as before */}
-        <div style={{ maxWidth: "500px", margin: "0 auto" }}>
+        <div style={{ maxWidth: "540px", margin: "0 auto" }}>
 
           <AnimatePresence mode="wait">
             {/* Initializing */}
@@ -515,6 +548,8 @@ export default function App() {
                   communitySavings={communitySavings}
                   userPrompt={userPrompt}
                   idealPrompt={idealPrompt}
+                  onShare={handleShare}
+                  onBackToMenu={handleBackToMenu}
                 />
               </motion.div>
             )}
@@ -566,7 +601,6 @@ export default function App() {
             )}
           </AnimatePresence>
 
-        </div>
         </div>
       </div>
       {modals}

@@ -78,7 +78,7 @@ export function WaterGlass({ waterMl }: { waterMl: number }) {
             y={fillY + 8}
             width={glassW}
             height={glassH - fillY}
-            fill="#14B8A6"
+            fill="var(--ps-teal)"
             style={{ transition: "y 2.5s cubic-bezier(0.1,0.8,0.2,1)" }}
           />
 
@@ -87,7 +87,7 @@ export function WaterGlass({ waterMl }: { waterMl: number }) {
             animation: "wave-move 4s ease-in-out infinite",
             transition: "transform 2.5s cubic-bezier(0.1,0.8,0.2,1)",
           }}>
-            <path
+              <path
               d={`
                 M ${-glassW} ${fillY}
                 Q ${-glassW + glassW * 0.25} ${fillY - 8} ${-glassW + glassW * 0.5} ${fillY}
@@ -100,7 +100,7 @@ export function WaterGlass({ waterMl }: { waterMl: number }) {
                 L ${-glassW} ${glassH}
                 Z
               `}
-              fill="#14B8A6"
+              fill="var(--ps-teal)"
             />
           </g>
 

@@ -12,14 +12,16 @@ interface AlreadyPlayedProps {
   communitySavings: { waterLiters: number; co2Kg: number };
   userPrompt?: string;
   idealPrompt?: string;
+  onShare: () => void;
+  onBackToMenu: () => void;
 }
 
 // AdmireSplash replaced by `AdmireScreen` component (see src/screens/AdmireScreen.tsx)
 
-function AdmireStats({ score, challenge, personalSavings, communitySavings, userPrompt, idealPrompt }: AlreadyPlayedProps) {
+function AdmireStats({ score, challenge, personalSavings, communitySavings, userPrompt, idealPrompt, onShare, onBackToMenu }: AlreadyPlayedProps) {
   const defaultScore = score ?? { accuracy: 0, format: 0, brevity: 0, total: 0, waterMl: 0, co2Grams: 0 };
   return (
-    <div style={{ padding: "16px", borderRadius: "14px", border: "4px solid rgba(20,184,166,0.95)", background: "rgba(20,184,166,0.06)" }}>
+    <div className="ps-centered-panel" style={{ borderRadius: "14px", border: "4px solid var(--ps-teal)", background: "rgba(14,167,154,0.06)" }}>
       <ResultsScreen
         score={defaultScore}
         gameState={"impact"}
@@ -29,15 +31,24 @@ function AdmireStats({ score, challenge, personalSavings, communitySavings, user
         userPrompt={userPrompt ?? ""}
         personalSavings={personalSavings}
         communitySavings={communitySavings}
-        onShare={() => {}}
-        onBackToMenu={() => {}}
+        onShare={onShare}
+        onBackToMenu={onBackToMenu}
         challenge={challenge}
       />
     </div>
   );
 }
 
-export function AlreadyPlayed({ score, challenge, personalSavings, communitySavings, userPrompt = "", idealPrompt = "" }: AlreadyPlayedProps) {
+export function AlreadyPlayed({
+  score,
+  challenge,
+  personalSavings,
+  communitySavings,
+  userPrompt = "",
+  idealPrompt = "",
+  onShare,
+  onBackToMenu,
+}: AlreadyPlayedProps) {
   const [phase, setPhase] = useState<"splash" | "stats">("splash");
 
   if (phase === "splash") return <AdmireScreen onAdmire={() => setPhase("stats")} />;
@@ -50,6 +61,8 @@ export function AlreadyPlayed({ score, challenge, personalSavings, communitySavi
       communitySavings={communitySavings}
       userPrompt={userPrompt}
       idealPrompt={idealPrompt}
+      onShare={onShare}
+      onBackToMenu={onBackToMenu}
     />
   );
 }

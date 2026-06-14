@@ -91,6 +91,10 @@ CREATE POLICY "Allow authenticated users to insert their own scores"
   ON public.scores FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Allow authenticated users to delete their own scores"
+  ON public.scores FOR DELETE
+  USING (auth.uid() = user_id);
+
 
 -- ============================================================================
 -- Seed Initial Challenges

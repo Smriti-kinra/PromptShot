@@ -145,8 +145,8 @@ export function ResultsScreen({
       const duration = 1.5 * 1000;
       const end = Date.now() + duration;
       const frame = () => {
-        confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors: ["#F59E0B", "#14B8A6", "#6EE09B"] });
-        confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors: ["#F59E0B", "#14B8A6", "#6EE09B"] });
+        confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors: ["#F59E0B", "#0EA79A", "#6EE09B"] });
+        confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors: ["#F59E0B", "#0EA79A", "#6EE09B"] });
         if (Date.now() < end) requestAnimationFrame(frame);
       };
       frame();
@@ -166,7 +166,7 @@ export function ResultsScreen({
 
       {/* ── Bullseye rings ── */}
       <motion.div {...fadeUp(0.05)} style={{ textAlign: "center", marginBottom: "32px" }}>
-        <svg width="200" height="200" viewBox="0 0 200 200" style={{ margin: "0 auto" }}>
+          <svg className="ps-bullseye-svg" viewBox="0 0 200 200" style={{ margin: "0 auto" }}>
           {bars.map(({ label, value, max, r }, i) => {
             const circumference = 2 * Math.PI * r;
             const targetOffset = circumference * (1 - value / max);
@@ -230,8 +230,20 @@ export function ResultsScreen({
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.98 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={!didYouKnowOpen ? {
+              scale: 1.015,
+              y: -2,
+              backgroundColor: "rgba(20, 184, 166, 0.08)",
+              borderColor: "rgba(20, 184, 166, 0.35)",
+              boxShadow: "0 12px 32px 0 rgba(0, 0, 0, 0.45), 0 0 20px rgba(20, 184, 166, 0.15)",
+            } : {}}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="ps-glass-panel"
+            onClick={() => {
+              if (!didYouKnowOpen) {
+                setDidYouKnowOpen(true);
+              }
+            }}
             style={{
               background: "rgba(20, 184, 166, 0.04)",
               borderLeft: "4px solid var(--ps-teal)",
@@ -241,12 +253,16 @@ export function ResultsScreen({
               display: "flex",
               flexDirection: "column",
               gap: "16px",
+              cursor: !didYouKnowOpen ? "pointer" : "default",
             }}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
-                onClick={() => setDidYouKnowOpen(d => !d)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDidYouKnowOpen(d => !d);
+                }}
               >
                 <div style={{ fontFamily: "var(--ps-font-ui)", fontSize: "18px", fontWeight: 700, color: "var(--ps-teal)", letterSpacing: "0.02em" }}>
                   Did you know? 🌍

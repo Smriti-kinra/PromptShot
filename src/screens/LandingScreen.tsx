@@ -1,4 +1,5 @@
 import { soundManager } from "../lib/sounds";
+import { Wordmark } from "../components/Wordmark";
 
 type GameState = "challenge" | "loading" | "results" | "impact" | "already-played";
 
@@ -39,8 +40,8 @@ export function LandingScreen({
       }}
     >
       {/* Animated SVG Target & Arrow */}
-      <div style={{ width: "160px", height: "160px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
-        <svg width="160" height="160" viewBox="0 0 160 160" style={{ overflow: "visible" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
+        <svg className="ps-target-svg" viewBox="0 0 160 160" style={{ overflow: "visible" }}>
           <circle
             cx="80" cy="80" r="14"
             fill="none" stroke="var(--ps-amber)"
@@ -61,12 +62,7 @@ export function LandingScreen({
         </svg>
       </div>
 
-      {/* Wordmark */}
-      <div style={{ display: "flex", alignItems: "center", gap: "2px", justifyContent: "center", marginBottom: "12px" }}>
-        <span style={{ fontFamily: "Space Grotesk", fontSize: "36px", fontWeight: 800, letterSpacing: "-0.04em", color: "var(--ps-text-primary)" }}>Prompt</span>
-        <span style={{ fontFamily: "Space Grotesk", fontSize: "36px", fontWeight: 400, fontStyle: "italic", letterSpacing: "-0.03em", color: "var(--ps-teal)", paddingRight: "6px" }}>Shot</span>
-        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--ps-amber)", alignSelf: "flex-end", marginBottom: "8px" }} />
-      </div>
+      <Wordmark size="lg" style={{ marginBottom: "12px" }} />
 
       <p style={{ fontSize: "var(--ps-text-body)", color: "var(--ps-text-secondary)", maxWidth: "320px", lineHeight: "1.6", marginBottom: "32px" }}>
         Can you shoot a perfect prompt??
@@ -77,9 +73,6 @@ export function LandingScreen({
 
       {/* Difficulty selector */}
       <div style={{ marginBottom: "24px", width: "100%", maxWidth: "280px" }}>
-        <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "var(--ps-font-mono)", marginBottom: "8px", textAlign: "center" }}>
-          Select Level
-        </div>
         <div className="ps-glass-panel" style={{ display: "flex", background: "rgba(255, 255, 255, 0.01)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "24px", padding: "4px", gap: "4px" }}>
           {(["BEGINNER", "PRO", "EXPERT"] as const).map((d) => {
             const isSelected = difficulty === d;
@@ -152,7 +145,7 @@ export function LandingScreen({
       )}
 
       <div style={{ marginTop: "40px", fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontFamily: "var(--ps-font-mono)", lineHeight: "1.6" }}>
-        💡 Fun Fact: Every sloppy, wordy prompt makes an AI server sweat and drink more water.
+        💡 Fun Fact: A clear prompt and a vague one take the same effort to type. They don't take the same effort to run.
       </div>
     </div>
   );

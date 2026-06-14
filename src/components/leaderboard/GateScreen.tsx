@@ -221,27 +221,41 @@ export function GateScreen({ onClose }: GateScreenProps) {
 
   return (
     <div style={{ padding: "8px 0" }}>
-      {/* Trophy graphic */}
+      {/* Graphic */}
       <div style={{ textAlign: "center", marginBottom: "20px" }}>
         <div style={{
           width: "72px", height: "72px", borderRadius: "50%",
-          background: "rgba(245, 197, 24, 0.1)",
-          border: `2px solid rgba(245, 197, 24, 0.25)`,
+          background: "rgba(245, 197, 24, 0.08)",
+          border: "2px solid rgba(245, 197, 24, 0.2)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "0 auto 16px", fontSize: "32px",
+          margin: "0 auto 16px",
+          color: "var(--ps-amber)",
         }}>
-          {authMode === "forgot" ? "🔑" : "🏆"}
+          {authMode === "forgot" ? (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
+            </svg>
+          ) : (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 3.5h12l-1 7.5a5 5 0 0 1-5 4.5 5 5 0 0 1-5-4.5L6 3.5z" />
+              <path d="M6 5C3.5 5 2.5 7 3.5 10.5" />
+              <path d="M18 5C20.5 5 21.5 7 20.5 10.5" />
+              <path d="M11 15.5c0 2-.8 3.5-1.5 5" />
+              <path d="M13 15.5c0 2 .8 3.5 1.5 5" />
+              <rect x="7" y="20.5" width="10" height="2.5" rx="1" />
+            </svg>
+          )}
         </div>
         <div style={{ fontSize: "20px", fontWeight: 700, color: C.primary, fontFamily: C.font, marginBottom: "8px", lineHeight: 1.2 }}>
           {authMode === "signin" ? "See where you rank" : authMode === "signup" ? "Join the leaderboard" : "Reset your password"}
         </div>
-        <div style={{ fontSize: "13px", color: C.secondary, fontFamily: C.font, lineHeight: 1.5, maxWidth: "260px", margin: "0 auto" }}>
-          {authMode === "signin"
-            ? "Your score is saved locally. Sign in to appear on the leaderboard."
-            : authMode === "signup"
-            ? "Create an account to save your streak and compete globally."
-            : "Enter your email and we'll send a reset link."}
-        </div>
+        {authMode !== "signin" && (
+          <div style={{ fontSize: "13px", color: C.secondary, fontFamily: C.font, lineHeight: 1.5, maxWidth: "260px", margin: "0 auto" }}>
+            {authMode === "signup"
+              ? "Create an account to save your streak and compete globally."
+              : "Enter your email and we'll send a reset link."}
+          </div>
+        )}
       </div>
 
       <div style={{ height: "1px", background: C.border, margin: "20px 0" }} />
@@ -338,13 +352,20 @@ export function GateScreen({ onClose }: GateScreenProps) {
           disabled={authLoading}
           style={{
             width: "100%", height: "44px",
-            background: C.mint, color: "#0B1610",
+            background: authMode === "signin" ? "var(--ps-amber)" : C.mint,
+            color: "#000",
             border: "none", borderRadius: "8px",
             fontSize: "14px", fontWeight: 700,
             cursor: authLoading ? "not-allowed" : "pointer",
             marginTop: "4px", fontFamily: C.font,
-            transition: "opacity 0.15s",
+            transition: "opacity 0.15s, transform 0.1s ease",
             opacity: authLoading ? 0.6 : 1,
+          }}
+          onMouseEnter={(e) => {
+            if (!authLoading) e.currentTarget.style.transform = "scale(1.015)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
           }}
         >
           {authLoading
@@ -379,8 +400,8 @@ export function GateScreen({ onClose }: GateScreenProps) {
       {info && (
         <div style={{
           color: C.mint, fontSize: "12px", marginTop: "10px",
-          fontFamily: C.mono, background: "rgba(20,184,166,0.08)",
-          border: "1px solid rgba(20,184,166,0.2)", borderRadius: "6px",
+          fontFamily: C.mono, background: "rgba(14,167,154,0.08)",
+          border: "1px solid rgba(14,167,154,0.2)", borderRadius: "6px",
           padding: "8px 10px", lineHeight: 1.5,
         }}>
           {info}

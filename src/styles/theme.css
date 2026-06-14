@@ -12,7 +12,7 @@
   --ps-surface:       #121C14;
   --ps-surface-2:     #1A2E1C;
   --ps-text-primary:  #D4E8D4;
-  --ps-text-secondary:#4A6B4A;
+  --ps-text-secondary:  #76AB76;
   --ps-text-muted:    #2E4F31;
   --ps-mint:          #6EE09B;
   --ps-teal:          #0EA79A;
@@ -44,6 +44,38 @@
   --border:     oklch(0.25 0.033 145);  /* ≈ --ps-border */
   --ring:       oklch(0.82 0.13 155);   /* focus ring */
   --radius:     0.5rem;
+
+  /* Responsive sizing tokens */
+  --ps-target-size: clamp(96px, 18vw, 160px);
+  --ps-bullseye-size: clamp(120px, 28vw, 200px);
+}
+
+/* Responsive helpers */
+.ps-target-svg {
+  width: var(--ps-target-size);
+  height: var(--ps-target-size);
+  display: block;
+}
+
+.ps-bullseye-svg {
+  width: var(--ps-bullseye-size);
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.ps-centered-panel {
+  padding: clamp(12px, 3vw, 24px);
+}
+
+@media (max-width: 520px) {
+  :root {
+    --ps-text-subhead: 16px;
+    --ps-text-body: 14px;
+  }
+  .ps-tooltip-text {
+    width: 180px;
+  }
 }
 
 /* ── Tailwind v4 theme bridge ─────────────────────────────────────────────── */
@@ -233,5 +265,87 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ── Responsive design system ────────────────────────────────────────────── */
+/*
+  Strategy: fluid values via clamp() + breakpoint overrides.
+  Breakpoints:
+    xs  < 400px   (small phones)
+    sm  < 640px   (phones)
+    md  < 768px   (large phones / small tablets)
+    lg  < 1024px  (tablets)
+*/
+
+:root {
+  /* Fluid typography — scales between phone and desktop */
+  --ps-size-wordmark-lg:   clamp(24px, 6vw, 36px);
+  --ps-size-wordmark-md:   clamp(18px, 4vw, 24px);
+  --ps-size-wordmark-sm:   clamp(15px, 3.5vw, 18px);
+
+  --ps-size-display:       clamp(28px, 7vw, 40px);
+  --ps-size-heading:       clamp(20px, 5vw, 28px);
+  --ps-size-subhead:       clamp(15px, 4vw, 18px);
+  --ps-size-body:          clamp(13px, 3.5vw, 15px);
+  --ps-size-caption:       clamp(10px, 2.5vw, 11px);
+
+  /* Fluid spacing */
+  --ps-pad-page:           clamp(12px, 4vw, 24px);
+  --ps-pad-card:           clamp(14px, 3vw, 24px);
+
+  /* Fluid container */
+  --ps-content-max:        min(540px, 100%);
+}
+
+/* Content wrapper — fluid padding */
+.ps-content-wrap {
+  width: 100%;
+  max-width: var(--ps-content-max);
+  margin: 0 auto;
+  padding-left: var(--ps-pad-page);
+  padding-right: var(--ps-pad-page);
+  box-sizing: border-box;
+}
+
+/* Fluid SVG target container */
+.ps-target-svg {
+  width:  clamp(100px, 40vw, 160px);
+  height: clamp(100px, 40vw, 160px);
+}
+
+/* Fluid bullseye score ring */
+.ps-score-svg {
+  width:  clamp(150px, 50vw, 200px);
+  height: clamp(150px, 50vw, 200px);
+}
+
+/* Fluid button */
+.ps-btn-primary {
+  width: 100%;
+  max-width: clamp(200px, 80vw, 280px);
+  height: clamp(44px, 10vw, 52px);
+  font-size: clamp(13px, 3.5vw, 16px);
+}
+
+/* Fluid pill selector (difficulty) */
+.ps-pill-selector {
+  width: 100%;
+  max-width: clamp(220px, 80vw, 280px);
+}
+
+/* Glass cards — fluid padding on small screens */
+@media (max-width: 400px) {
+  .ps-glass-panel,
+  .ps-glass-panel-amber {
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+}
+
+/* Score bars — tighten labels on small screens */
+@media (max-width: 400px) {
+  :root {
+    --ps-text-secondary-size: 12px;
   }
 }
