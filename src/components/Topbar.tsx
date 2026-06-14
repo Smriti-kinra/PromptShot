@@ -112,7 +112,7 @@ function NavMenu({
         <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
           <span style={{ fontFamily: T.font, fontSize: "16px", fontWeight: 850, color: T.primary, letterSpacing: "-0.04em" }}>Prompt</span>
           <span style={{ fontFamily: T.font, fontSize: "16px", fontWeight: 300, fontStyle: "italic", color: T.mint, paddingRight: "2px", letterSpacing: "-0.03em" }}>Shot</span>
-          <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: T.amber, marginRight: "4px", alignSelf: "center", marginTop: "2px" }} />
+          <span className="ps-wordmark-dot" style={{ width: "4px", height: "4px", borderRadius: "50%", background: T.amber, marginRight: "4px", alignSelf: "center", marginTop: "2px" }} />
         </div>
         <button
           onClick={onClose}
@@ -158,7 +158,7 @@ function NavMenu({
       >
         <span style={{ fontFamily: T.font, fontSize: "14px", fontWeight: 850, color: T.primary, letterSpacing: "-0.04em" }}>Prompt</span>
         <span style={{ fontFamily: T.font, fontSize: "14px", fontWeight: 300, fontStyle: "italic", color: T.teal, paddingRight: "2px", letterSpacing: "-0.03em" }}>Shot</span>
-        <span style={{ width: "3px", height: "3px", borderRadius: "50%", background: T.amber, marginRight: "5px", alignSelf: "center", marginTop: "3px" }} />
+        <span className="ps-wordmark-dot" style={{ width: "3px", height: "3px", borderRadius: "50%", background: T.amber, marginRight: "5px", alignSelf: "center", marginTop: "3px" }} />
         <span style={{ fontFamily: T.font, fontSize: "14px", fontWeight: 700, color: T.primary, marginRight: "4px" }}>101</span>
         <span style={{ fontFamily: T.font, fontSize: "14px", color: T.secondary }}>›</span>
       </button>

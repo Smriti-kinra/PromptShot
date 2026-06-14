@@ -41,7 +41,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
         padding: "10px 20px",
         borderRadius: "9999px",
         fontSize: "14px",
-        fontFamily: "Space Grotesk, system-ui, sans-serif",
+        fontFamily: "var(--ps-font-ui)",
         fontWeight: 600,
         zIndex: 9999,
         display: "flex",
@@ -57,11 +57,133 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   );
 }
 
+interface ActiveArrow {
+  id: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  angle: number;
+}
+
+function ShootingArrow({ arrow, onComplete }: { arrow: ActiveArrow; onComplete: () => void }) {
+  return (
+    <motion.div
+      initial={{ 
+        position: "fixed",
+        left: arrow.startX,
+        top: arrow.startY,
+        x: "0%",
+        y: "-50%",
+        rotate: arrow.angle,
+        transformOrigin: "left center",
+        opacity: 1,
+        scale: 1.2,
+        zIndex: 9999,
+        pointerEvents: "none",
+      }}
+      animate={{ 
+        left: arrow.endX,
+        top: arrow.endY,
+        opacity: [1, 1, 0],
+        scale: [1.2, 1.45, 1.35],
+      }}
+      transition={{ 
+        duration: 0.32, 
+        ease: [0.22, 1, 0.36, 1]
+      }}
+      onAnimationComplete={onComplete}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <svg width="54" height="18" viewBox="0 -6 36 12" style={{ overflow: "visible" }}>
+        <line x1="4" y1="0" x2="28" y2="0" stroke="var(--ps-text-primary)" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M 4 -4 L 10 0 L 4 4 L 0 4 L 5 0 L 0 -4 Z" fill="var(--ps-teal)" />
+        <polygon points="28,-3 34,0 28,3" fill="var(--ps-amber)" />
+      </svg>
+    </motion.div>
+  );
+}
+
 // ─── main component ───────────────────────────────────────────────────────────
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
+
+  const [arrows, setArrows] = useState<ActiveArrow[]>([]);
+
+  useEffect(() => {
+    const isInteractive = (el: HTMLElement | null, depth = 0): boolean => {
+      if (!el || depth > 5) return false;
+      const tagName = el.tagName.toLowerCase();
+      if (el.id === "root" || tagName === "body" || tagName === "html") {
+        return false;
+      }
+      if (["button", "input", "textarea", "a", "select", "option", "label"].includes(tagName)) {
+        return true;
+      }
+      if (el.getAttribute("role") === "button" || el.onclick || el.getAttribute("onClick")) {
+        return true;
+      }
+      const style = window.getComputedStyle(el);
+      if (style.cursor === "pointer") {
+        return true;
+      }
+      return isInteractive(el.parentElement, depth + 1);
+    };
+
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (isInteractive(target)) return;
+
+      // Locate wordmark yellow dot center
+      const dotEl = document.querySelector(".ps-wordmark-dot");
+      let startX = window.innerWidth / 2;
+      let startY = 160; // approximate center of target on landing screen
+      
+      if (dotEl) {
+        const rect = dotEl.getBoundingClientRect();
+        startX = rect.left + rect.width / 2;
+        startY = rect.top + rect.height / 2;
+      } else {
+        const targetEl = document.querySelector(".ps-target-svg") || document.querySelector(".ps-bullseye-svg");
+        if (targetEl) {
+          const rect = targetEl.getBoundingClientRect();
+          startX = rect.left + rect.width / 2;
+          startY = rect.top + rect.height / 2;
+        }
+      }
+      
+      const gridSize = 48;
+      const targetX = Math.round(e.clientX / gridSize) * gridSize;
+      const targetY = Math.round(e.clientY / gridSize) * gridSize;
+      
+      const dx = targetX - startX;
+      const dy = targetY - startY;
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      
+      const newArrow: ActiveArrow = {
+        id: Date.now() + Math.random(),
+        startX,
+        startY,
+        endX: targetX,
+        endY: targetY,
+        angle,
+      };
+      
+      // Play a quick release sound
+      soundManager.playClick();
+      
+      setArrows((prev) => [...prev, newArrow]);
+    };
+    
+    window.addEventListener("click", handleGlobalClick);
+    return () => window.removeEventListener("click", handleGlobalClick);
+  }, []);
 
   // Expose reset database utility to window object for developer/admin reset requests
   useEffect(() => {
@@ -461,7 +583,7 @@ export default function App() {
   );
 
   const contentStyle: React.CSSProperties = {
-    fontFamily: "Space Grotesk, system-ui, sans-serif",
+    fontFamily: "var(--ps-font-ui)",
     background: "transparent",
     color: "var(--ps-text-primary)",
     minHeight: "100vh",
@@ -604,6 +726,17 @@ export default function App() {
         </div>
       </div>
       {modals}
+
+      {/* Click-triggered shooting arrows */}
+      {arrows.map((arrow) => (
+        <ShootingArrow
+          key={arrow.id}
+          arrow={arrow}
+          onComplete={() => {
+            setArrows((prev) => prev.filter((a) => a.id !== arrow.id));
+          }}
+        />
+      ))}
     </>
   );
 }

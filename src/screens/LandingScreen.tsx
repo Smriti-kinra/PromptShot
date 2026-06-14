@@ -1,9 +1,10 @@
+import { useEffect } from "react";
+import { motion } from "motion/react";
 import { soundManager } from "../lib/sounds";
 import { Wordmark } from "../components/Wordmark";
+import { useCountdownToMidnight } from "../hooks/useCountdownToMidnight";
 
 type GameState = "challenge" | "loading" | "results" | "impact" | "already-played";
-
-import { useCountdownToMidnight } from "../hooks/useCountdownToMidnight";
 
 function CountdownTimer() {
   const { h, m, s } = useCountdownToMidnight();
@@ -27,8 +28,54 @@ export function LandingScreen({
   onDifficultyChange,
   onPlay,
 }: LandingScreenProps) {
+  
+  useEffect(() => {
+    // Play a welcoming archery-chime sound on load
+    soundManager.playWelcome();
+  }, []);
+
+  const containerVariants = {
+    hidden: {},
+    visible: {
+      transition: {
+        staggerChildren: 0.08,
+      }
+    }
+  };
+
+  const targetVariants = {
+    hidden: { opacity: 0, scale: 0.75, y: 15 },
+    visible: { 
+      opacity: 1, 
+      scale: 1, 
+      y: 0,
+      transition: { 
+        type: "spring", 
+        stiffness: 120, 
+        damping: 14, 
+        mass: 0.9 
+      } 
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 16, scale: 0.98 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1, 
+      transition: { 
+        duration: 0.5, 
+        ease: [0.22, 1, 0.36, 1] 
+      } 
+    }
+  };
+
   return (
-    <div
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -40,7 +87,10 @@ export function LandingScreen({
       }}
     >
       {/* Animated SVG Target & Arrow */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
+      <motion.div 
+        variants={targetVariants} 
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}
+      >
         <svg className="ps-target-svg" viewBox="0 0 160 160" style={{ overflow: "visible" }}>
           <circle
             cx="80" cy="80" r="14"
@@ -60,19 +110,27 @@ export function LandingScreen({
             <polygon points="0,0 -8,-4 -6,0 -8,4" fill="var(--ps-amber)" />
           </g>
         </svg>
-      </div>
+      </motion.div>
 
-      <Wordmark size="lg" style={{ marginBottom: "12px" }} />
+      <motion.div variants={itemVariants}>
+        <Wordmark size="lg" style={{ marginBottom: "12px" }} />
+      </motion.div>
 
-      <p style={{ fontSize: "var(--ps-text-body)", color: "var(--ps-text-secondary)", maxWidth: "320px", lineHeight: "1.6", marginBottom: "32px" }}>
+      <motion.p 
+        variants={itemVariants} 
+        style={{ fontSize: "var(--ps-text-body)", color: "var(--ps-text-secondary)", maxWidth: "320px", lineHeight: "1.6", marginBottom: "32px", fontFamily: "var(--ps-font-ui)" }}
+      >
         Can you shoot a perfect prompt??
         <br />
         <br />
         Stop chatting with AI like it's your therapist and get the output in one clean shot. Thirsty data centers are counting on you.
-      </p>
+      </motion.p>
 
       {/* Difficulty selector */}
-      <div style={{ marginBottom: "24px", width: "100%", maxWidth: "280px" }}>
+      <motion.div 
+        variants={itemVariants} 
+        style={{ marginBottom: "24px", width: "100%", maxWidth: "280px" }}
+      >
         <div className="ps-glass-panel" style={{ display: "flex", background: "rgba(255, 255, 255, 0.01)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "24px", padding: "4px", gap: "4px" }}>
           {(["BEGINNER", "PRO", "EXPERT"] as const).map((d) => {
             const isSelected = difficulty === d;
@@ -93,9 +151,15 @@ export function LandingScreen({
                   fontSize: "10px",
                   fontWeight: 700,
                   cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  fontFamily: "Space Grotesk",
+                  transition: "all 0.2s ease, transform 0.1s ease",
+                  fontFamily: "var(--ps-font-ui)",
                   letterSpacing: "0.05em",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) e.currentTarget.style.transform = "scale(1.03)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 {d}
@@ -103,50 +167,58 @@ export function LandingScreen({
             );
           })}
         </div>
-      </div>
+      </motion.div>
 
       {/* CTA buttons */}
-      {hasPlayedToday ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", alignItems: "center", marginBottom: "24px" }}>
-          <div style={{ 
-            display: "inline-flex", 
-            alignItems: "center", 
-            gap: "6px", 
-            padding: "6px 16px", 
-            borderRadius: "9999px", 
-            border: "1px solid var(--ps-teal)", 
-            color: "var(--ps-teal)", 
-            fontSize: "13px", 
-            fontWeight: 500,
-            marginBottom: "8px",
-            fontFamily: "Space Grotesk"
-          }}>
-            <span>✓</span> You already played today
+      <motion.div 
+        variants={itemVariants} 
+        style={{ width: "100%", display: "flex", justifyContent: "center" }}
+      >
+        {hasPlayedToday ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", alignItems: "center", marginBottom: "24px" }}>
+            <div style={{ 
+              display: "inline-flex", 
+              alignItems: "center", 
+              gap: "6px", 
+              padding: "6px 16px", 
+              borderRadius: "9999px", 
+              border: "1px solid var(--ps-teal)", 
+              color: "var(--ps-teal)", 
+              fontSize: "13px", 
+              fontWeight: 500,
+              marginBottom: "8px",
+              fontFamily: "var(--ps-font-ui)"
+            }}>
+              <span>✓</span> You already played today
+            </div>
+
+            <div style={{ fontSize: "14px", color: "var(--ps-text-secondary)", marginBottom: "4px", fontFamily: "var(--ps-font-ui)" }}>
+              come back tomorrow~
+            </div>
+
+            <CountdownTimer />
           </div>
+        ) : (
+          <button
+            onClick={() => {
+              soundManager.playClick();
+              onPlay();
+            }}
+            style={{ width: "100%", maxWidth: "280px", height: "52px", background: "var(--ps-amber)", color: "#000", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: 700, cursor: "pointer", transition: "transform 0.15s ease", fontFamily: "var(--ps-font-ui)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            Play Today's Challenge
+          </button>
+        )}
+      </motion.div>
 
-          <div style={{ fontSize: "14px", color: "var(--ps-text-secondary)", marginBottom: "4px", fontFamily: "Space Grotesk" }}>
-            come back tomorrow~
-          </div>
-
-          <CountdownTimer />
-        </div>
-      ) : (
-        <button
-          onClick={() => {
-            soundManager.playClick();
-            onPlay();
-          }}
-          style={{ width: "100%", maxWidth: "280px", height: "52px", background: "var(--ps-amber)", color: "#000", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: 700, cursor: "pointer", transition: "transform 0.15s ease", fontFamily: "Space Grotesk" }}
-          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-        >
-          Play Today's Challenge
-        </button>
-      )}
-
-      <div style={{ marginTop: "40px", fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontFamily: "var(--ps-font-mono)", lineHeight: "1.6" }}>
+      <motion.div 
+        variants={itemVariants}
+        style={{ marginTop: "40px", fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontFamily: "var(--ps-font-mono)", lineHeight: "1.6" }}
+      >
         💡 Fun Fact: A clear prompt and a vague one take the same effort to type. They don't take the same effort to run.
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -8,6 +8,7 @@ import { getScoreLabel, getWaterComparison } from "../lib/gameUtils";
 import { mockScore } from "../lib/scorer";
 import { T } from "../styles/tokens";
 import { PromptDiff } from "../components/PromptDiff";
+import { computeWordDiff } from "../lib/diff";
 
 interface ResultsScreenProps {
   score: ScoreResult;
@@ -131,6 +132,11 @@ export function ResultsScreen({
   const [playRings, setPlayRings] = useState(false);
   const [didYouKnowOpen, setDidYouKnowOpen] = useState(false);
 
+  const diffTokens = userPrompt && idealPrompt ? computeWordDiff(userPrompt, idealPrompt) : [];
+  const hasRemovals = diffTokens.some((t) => t.type === "removed");
+  const hasAdditions = diffTokens.some((t) => t.type === "added");
+  const isIdeal = diffTokens.length > 0 && !hasRemovals && !hasAdditions;
+
   useEffect(() => {
     if (animateScore) {
       const t = setTimeout(() => setPlayRings(true), 80);
@@ -160,7 +166,7 @@ export function ResultsScreen({
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6 }}>
           <span style={{ fontFamily: T.font, fontSize: 20, fontWeight: 800, color: T.primary, letterSpacing: "-0.02em" }}>Prompt</span>
           <span style={{ fontFamily: T.font, fontSize: 20, fontWeight: 300, fontStyle: "italic", color: T.mint, paddingRight: "2px" }}>Shot</span>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, marginLeft: 6 }} />
+          <span className="ps-wordmark-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, marginLeft: 6 }} />
         </div>
       </motion.div>
 
@@ -177,7 +183,7 @@ export function ResultsScreen({
                   cx="100" cy="100" r={r}
                   fill="none" stroke="var(--ps-amber)" strokeWidth="12"
                   strokeDasharray={`${circumference}`}
-                  strokeDashoffset={playRings ? `${targetOffset}` : `${circumference}`}
+                  strokeDashoffset={(!animateScore || playRings) ? `${targetOffset}` : `${circumference}`}
                   transform="rotate(-90 100 100)"
                   style={{ transition: `stroke-dashoffset 0.9s cubic-bezier(0.22, 1, 0.36, 1) ${i * 0.2}s` }}
                 >
@@ -352,7 +358,7 @@ export function ResultsScreen({
       )}
 
       {/* ── Per-dimension coaching feedback ── */}
-      {(() => {
+      {!isIdeal && (() => {
         const fb = getScoreFeedback(score.accuracy, score.format, score.brevity);
         const allGood = fb.dim === "All";
         const accentColor = allGood ? "var(--ps-teal)" : "var(--ps-amber)";
@@ -416,7 +422,7 @@ export function ResultsScreen({
             borderRadius: "8px", fontSize: "var(--ps-text-secondary-size)", fontWeight: 600, cursor: "pointer",
             transition: "transform 0.18s cubic-bezier(0.22,1,0.36,1), opacity 0.18s ease",
           }}
-          onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.02)")}
+          onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.03)")}
           onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
         >
           Share result

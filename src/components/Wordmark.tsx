@@ -33,7 +33,7 @@ export function Wordmark({ size = "md", style }: WordmarkProps) {
     >
       <span
         style={{
-          fontFamily: "Space Grotesk, system-ui, sans-serif",
+          fontFamily: "var(--ps-font-ui)",
           fontSize: `${px}px`,
           fontWeight: 800,
           letterSpacing: "-0.04em",
@@ -45,7 +45,7 @@ export function Wordmark({ size = "md", style }: WordmarkProps) {
       </span>
       <span
         style={{
-          fontFamily: "Space Grotesk, system-ui, sans-serif",
+          fontFamily: "var(--ps-font-ui)",
           fontSize: `${px}px`,
           fontWeight: 400,
           fontStyle: "italic",
@@ -57,12 +57,13 @@ export function Wordmark({ size = "md", style }: WordmarkProps) {
         Shot
       </span>
       <span
+        className="ps-wordmark-dot"
         style={{
           width: `${Math.round(px * 0.18)}px`,
           height: `${Math.round(px * 0.18)}px`,
           borderRadius: "50%",
           background: "var(--ps-amber)",
-          marginLeft: `${Math.round(px * 0.22)}px`,
+          marginLeft: `${Math.round(px * 0.45)}px`,
           flexShrink: 0,
           alignSelf: "center",
         }}

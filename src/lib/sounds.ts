@@ -181,5 +181,33 @@ export const soundManager = {
       noteOsc.start(now + index * 0.08);
       noteOsc.stop(now + index * 0.08 + 0.35);
     });
+  },
+
+  playWelcome() {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // Ascending G-major chord tones (G4, B4, D5) representing target loading/welcome
+    const notes = [392.00, 493.88, 587.33];
+    
+    notes.forEach((freq, index) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + index * 0.075);
+      
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.setValueAtTime(0, now + index * 0.075);
+      gain.gain.linearRampToValueAtTime(0.04, now + index * 0.075 + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.075 + 0.25);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start(now + index * 0.075);
+      osc.stop(now + index * 0.075 + 0.3);
+    });
   }
 };

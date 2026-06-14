@@ -58,12 +58,12 @@ export function AdmireScreen({ onAdmire }: AdmireScreenProps) {
         fontSize: "13px", 
         fontWeight: 500,
         marginBottom: "16px",
-        fontFamily: "Space Grotesk"
+        fontFamily: "var(--ps-font-ui)"
       }}>
         <span>✓</span> You already played today
       </div>
 
-      <div style={{ fontSize: "14px", color: "var(--ps-text-secondary)", marginBottom: "8px", fontFamily: "Space Grotesk" }}>
+      <div style={{ fontSize: "14px", color: "var(--ps-text-secondary)", marginBottom: "8px", fontFamily: "var(--ps-font-ui)" }}>
         come back tomorrow~
       </div>
 
@@ -73,7 +73,19 @@ export function AdmireScreen({ onAdmire }: AdmireScreenProps) {
 
       <button
         onClick={() => { soundManager.playClick(); onAdmire(); }}
-        style={{ marginTop: "8px", padding: "12px 28px", borderRadius: "10px", background: "var(--ps-amber)", border: "none", cursor: "pointer", fontWeight: 700, fontSize: "16px" }}
+        style={{
+          marginTop: "8px",
+          padding: "12px 28px",
+          borderRadius: "10px",
+          background: "var(--ps-amber)",
+          border: "none",
+          cursor: "pointer",
+          fontWeight: 700,
+          fontSize: "16px",
+          transition: "transform 0.15s ease",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
+        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       >
         Admire your prompt →
       </button>

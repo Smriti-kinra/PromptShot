@@ -12,8 +12,46 @@ export function PromptDiff({ userPrompt, idealPrompt }: PromptDiffProps) {
 
   if (!hasRemovals && !hasAdditions) {
     return (
-      <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)", fontStyle: "italic", textAlign: "center", padding: "16px" }}>
-        ✓ Your prompt matched the ideal instructions almost exactly!
+      <div>
+        <div
+          className="ps-glass-panel"
+          style={{
+            background: "rgba(20, 184, 166, 0.03)",
+            border: "1px solid rgba(20, 184, 166, 0.12)",
+            padding: "16px",
+            marginBottom: "12px",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "10px",
+              color: "var(--ps-text-secondary)",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              display: "block",
+              marginBottom: "8px",
+              fontFamily: "var(--ps-font-mono)",
+            }}
+          >
+            Your Prompt
+          </span>
+          <div
+            style={{
+              fontFamily: "var(--ps-font-mono)",
+              fontSize: "13px",
+              lineHeight: "1.75",
+              color: "var(--ps-text-primary)",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {userPrompt}
+          </div>
+        </div>
+        <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontStyle: "italic", textAlign: "center", padding: "8px", fontWeight: 500 }}>
+          ✓ Your prompt matched the ideal instructions almost exactly!
+        </div>
       </div>
     );
   }

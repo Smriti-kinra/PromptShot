@@ -41,12 +41,18 @@ export function ChallengeScreen({
           display: "flex",
           alignItems: "center",
           gap: "4px",
-          fontFamily: "Space Grotesk",
+          fontFamily: "var(--ps-font-ui)",
           marginBottom: "16px",
-          transition: "color 0.15s ease",
+          transition: "color 0.15s ease, transform 0.15s ease",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ps-text-primary)")}
-        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--ps-text-secondary)")}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = "var(--ps-text-primary)";
+          e.currentTarget.style.transform = "scale(1.03)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = "var(--ps-text-secondary)";
+          e.currentTarget.style.transform = "scale(1)";
+        }}
       >
         ‹ Back to Home Menu
       </button>
@@ -74,7 +80,7 @@ export function ChallengeScreen({
               padding: "16px",
               borderRadius: "8px",
               marginBottom: "8px",
-              fontFamily: challenge.category === "CODE" ? "var(--ps-font-mono)" : "Space Grotesk",
+              fontFamily: challenge.category === "CODE" ? "var(--ps-font-mono)" : "var(--ps-font-ui)",
               fontSize: "var(--ps-text-secondary-size)",
               lineHeight: "1.6",
               whiteSpace: "pre-wrap",
@@ -141,7 +147,7 @@ export function ChallengeScreen({
             }}
             onMouseEnter={(e) => {
               if (userPrompt.trim()) {
-                e.currentTarget.style.transform = "scale(1.01)";
+                e.currentTarget.style.transform = "scale(1.03)";
               }
             }}
             onMouseLeave={(e) => {

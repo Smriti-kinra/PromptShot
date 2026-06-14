@@ -12,7 +12,7 @@
   --ps-surface:       #121C14;
   --ps-surface-2:     #1A2E1C;
   --ps-text-primary:  #D4E8D4;
-  --ps-text-secondary:  #76AB76;
+  --ps-text-secondary:  #9CD19C;
   --ps-text-muted:    #2E4F31;
   --ps-mint:          #6EE09B;
   --ps-teal:          #0EA79A;
@@ -348,4 +348,10 @@
   :root {
     --ps-text-secondary-size: 12px;
   }
+}
+
+/* Ensure placeholder font matches typed font */
+input::placeholder,
+textarea::placeholder {
+  font-family: inherit;
 }
