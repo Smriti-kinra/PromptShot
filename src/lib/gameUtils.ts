@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import type { Challenge } from "./supabase";
-import { DAILY_CHALLENGES } from "../app/challenges";
+import { DAILY_CHALLENGES } from "../data/challenges";
 
 // ─── score display helpers ─────────────────────────────────────────────────────
 

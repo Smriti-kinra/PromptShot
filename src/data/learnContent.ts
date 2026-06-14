@@ -43,8 +43,8 @@ export const LEARN_CONTENT = {
       subtitle: 'Common assumptions that are just wrong',
       items: [
         {
-          myth: 'Longer prompts produce better outputs',
-          reality: 'Extra words add noise and dilute instructions. A 50-word precise prompt using structured anatomy beats a 250-word rambling one every time.',
+          myth: 'Longer prompts with full background history are better',
+          reality: 'Adding noise dilutes core instructions. Models already possess general knowledge — only specify the facts and constraints unique to your task.',
           verdict: 'FALSE'
         },
         {
@@ -54,7 +54,7 @@ export const LEARN_CONTENT = {
         },
         {
           myth: 'Prompt engineering is only about words, not parameters',
-          reality: 'Think of AI like a dial between "strict and literal" and "creative and unpredictable." Your words tell the AI *what* to do, but behind the scenes there\'s a creativity setting. Turn it low and the AI gives safe, consistent answers. Turn it high and it gets inventive — but might wander. Good prompting means knowing which mode you\'re writing for.',
+          reality: 'Your words define "what" to generate, but model parameters (like temperature) dictate creativity and predictability. Match your prompt structure to the model\'s active settings.',
           verdict: 'FALSE'
         },
         {
@@ -71,11 +71,6 @@ export const LEARN_CONTENT = {
           myth: 'Repeating the same prompt differently will fix it',
           reality: 'If the output is wrong, repeating the exact prompt will yield similar errors. Diagnose which component (instruction, context, or format) failed, and adjust that specific element instead of a full rewrite.',
           verdict: 'WASTEFUL'
-        },
-        {
-          myth: 'You need to explain the whole background',
-          reality: 'The AI knows general knowledge. Only explain what is specific to your situation that it cannot infer.',
-          verdict: 'FALSE'
         }
       ]
     },
@@ -125,81 +120,40 @@ export const LEARN_CONTENT = {
         }
       ]
     },
-    {
-      id: 'impact',
-      title: 'Why efficient prompts matter',
-      subtitle: 'Based on "Making AI Less Thirsty" — Li et al., UC Riverside (2023). All values are modelled estimates, not exact measurements.',
-      items: [
-        {
-          metric: 'One-shot accuracy',
-          point: 'The cleanest environmental win is not needing a second or third attempt.',
-          detail: 'The UCR study estimates that a single conversational round (20–50 queries) evaporates roughly 500ml of water for cooling. That implies ~10–25ml per query — so multi-step follow-ups multiply the footprint. Importantly, these are modelled averages: real usage varies significantly by data center, cooling method, and energy grid.'
-        },
-        {
-          metric: 'Constraint density',
-          point: 'Useful constraints reduce wandering output.',
-          detail: 'Format, audience, tone, inclusions, and exclusions give the model a narrower target. That means less wasted generation, fewer tokens processed, and fewer correction loops — each of which carries an approximate resource cost.'
-        },
-        {
-          metric: 'Right-sized context',
-          point: 'Context should be specific, not encyclopedic.',
-          detail: 'The model already has general knowledge. Add only the facts it cannot infer: audience, goal, source material, and what would make the answer unusable. Every extra sentence in your prompt is extra tokens processed.'
-        },
-        {
-          metric: 'Negative space',
-          point: 'Saying what to avoid is often cheaper than cleaning it up later.',
-          detail: 'Negative constraints prevent common failure modes: jargon, sales language, unsafe advice, extra sections, unsupported claims, or code dependencies. One exclusion clause can prevent two rounds of corrections.'
-        }
-      ]
-    },
+
     {
       id: 'faq',
       title: 'FAQ',
       subtitle: null,
       items: [
         {
+          question: 'What motivated creating PromptShot?',
+          answer: 'Every time we ask AI a question, massive computer servers work in the background to generate answers. This process consumes electricity and requires fresh water to cool the hot servers down. PromptShot was created to show this resource impact and motivate writing accurate, one-shot prompts.'
+        },
+        {
           question: 'How is my score calculated?',
           answer: 'Three dimensions: Accuracy (Semantic Similarity 0–40 pts and Keyword Match 0–10 pts = 0–50 pts max), Format (Structural Match = 0–20 pts max), and Brevity (Green Efficiency: Token Economy 0–15 pts and Speed/Latency 0–15 pts = 0–30 pts max). Summing to 100 max.'
         },
-        {
-          question: 'Why does brevity matter if the output is accurate?',
-          answer: 'Every word you send to an AI model increases the computational load and thus energy and water usage. The 2023 paper "Making AI Less Thirsty" by Li et al. (UC Riverside) modelled that a conversational round consumes ~500ml of water. While this varies significantly by infrastructure and model, the directional insight holds: shorter, more precise prompts reduce the token workload per query. Achieving the same result with 40 words instead of 200 means less processing — and less resource use.'
-        },
-        {
-          question: 'How does AI actually use water?',
-          answer: 'AI models run in massive data centers that generate significant heat. A 2023 study by researchers at the University of California, Riverside (UCR) titled "Making AI Less Thirsty" estimates that a single conversational round (20-50 queries) evaporates roughly 500ml (half a liter) of water for server cooling and electricity generation. That means each query directly consumes 10-25ml of freshwater. Writing accurate, one-shot prompts avoids multi-step chat loops, directly conserving water resources.'
-        },
-        {
-          question: 'Why show environmental impact in a game?',
-          answer: 'Because the skill gap in prompting doesn\'t feel real until you see its cost. A person who needs 5 follow-up prompts to get the same output as someone who got it in one used 5× the resources. Prompt engineering is not just a productivity skill — it\'s a conservation behaviour.'
-        },
-        {
-          question: 'What should I optimize for first?',
-          answer: 'First-shot success. A short prompt that misses the target is not efficient if it creates three retries. The best prompt is clear enough to land the output once, then brief enough to avoid unnecessary tokens.'
-        },
-        {
-          question: 'What is a perfect prompt?',
-          answer: 'The shortest sequence of words that produces the target output with no follow-ups needed. It specifies task, format, context, and constraints — but nothing extra. Perfect prompts are rarely discovered on the first try. That\'s why this is a skill, not a trick.'
-        },
+
         {
           question: 'Can I replay today\'s challenge?',
           answer: 'No — the game is once-per-day by design, like Wordle. This creates the social moment: everyone is working from the same target. A new challenge unlocks at midnight.'
         },
         {
           question: 'Is reverse-engineering a real prompt engineering skill?',
-          answer: 'Yes — and a particularly demanding one. In production, engineers often work backwards from a required output format (a JSON schema, a report template, a test fixture) to a prompt that reliably generates it. PromptShot trains exactly this: given a precise output, can you write the minimal instruction that produces it? This teaches output-first thinking — the same discipline used when writing prompts for structured data extraction, code generation, and content pipelines.'
+          answer: 'Yes — in production, engineers often work backwards from a required output format (a JSON schema, a report template, a test fixture) to a prompt that reliably generates it. PromptShot trains exactly this output-first thinking.'
         },
         {
           question: 'How do BEGINNER, PRO, and EXPERT challenges differ?',
-          answer: 'BEGINNER challenges have short, unambiguous target outputs with clear structural signals — a function definition, a list, a simple paragraph. PRO challenges add multi-constraint targets: specific tone + structure + length simultaneously. EXPERT challenges require the player to infer implicit constraints from the output itself, such as a specific voice, a domain-specific schema, or a precise technical format that isn\'t explicitly described.'
+          answer: 'BEGINNER challenges have short, unambiguous target outputs with clear structural signals. PRO challenges add multi-constraint targets: specific tone + structure + length simultaneously. EXPERT challenges require the player to infer implicit constraints from the output itself, such as a specific voice or technical format.'
         },
         {
           question: 'Does this help with Generative AI prompt writing or Agentic AI?',
-          answer: 'PromptShot is designed specifically for Generative AI prompt writing (prompt engineering). It teaches you how to write clear, high-quality instructions to get the exact output you want on the first attempt (one-shot). It is not for Agentic AI (which involves building autonomous agent loops), though mastering precise prompt writing is also a core skill needed to instruct agents effectively.'
+          answer: 'PromptShot is designed specifically for Generative AI prompt writing. It teaches you how to write clear, high-quality instructions to get the exact output you want on the first attempt (one-shot). That skill is also a core pre-requisite for instructing autonomous agents effectively.'
         },
         {
           question: 'Why not just use an AI to write my prompts for me?',
-          answer: 'Using an AI to write prompts for basic, everyday tasks is a humorous exercise in over-engineering. If we require machine intelligence to draft the instructions for another machine just to produce a simple list or paragraph, we have added redundant middleware to our own thoughts. Setting environmental footprints aside, direct human-authored instructions preserve authentic intent, voice, and stylistic nuances. The human touch remains essential; delegating basic prompt crafting is simply outsourcing what our own minds can write in seconds.'
+          answer: 'Using an AI to write prompts for basic, everyday tasks is a humorous exercise in over-engineering. If we require machine intelligence to draft the instructions for another machine just to produce a simple list or paragraph, we have added redundant middleware to our own thoughts. Human-authored instructions preserve authentic intent, voice, and stylistic nuances.'
         }
       ]
     }

@@ -23,7 +23,7 @@ interface ImpactCardProps {
 [16px radius, 24px padding]
 Row 1: "This prompt used" [N] "API call" — [N] in teal
 Row 2: "≈ Xml water  ·  ≈ Xg CO₂" — X values in teal
-[If totalScore < 180, show this block separated by a 1px border:]
+[If totalScore < 60, show this block separated by a 1px border:]
 Row 3: "A score this low typically means 3+ follow-ups to reach this output"
 Row 4: "That's ≈ 30ml more — roughly a tablespoon" — "a tablespoon" in amber
 (amber here is intentional — it's a callout comparison, not an eco value)

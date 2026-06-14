@@ -141,6 +141,7 @@ You must evaluate the player's text across three distinct criteria:
 3. Keyword/Key-syntax Match (0 to 10 points): Did they correctly capture mandatory key terminology or specific technical functions?
 
 CRITICAL EXECUTION RULES:
+- If the player's generated text is completely unrelated to the target text, is absurd, or has zero contextual overlap, you MUST award exactly 0 points across all three criteria (Semantic Similarity = 0, Structural Match = 0, Keyword/Key-syntax Match = 0).
 - Be completely objective and strict. Small formatting or factual deviations should lose points.
 - Return your evaluation ONLY as a valid, raw JSON object. Do not wrap it in markdown code blocks (no \`\`\`json). Do not add conversational text.
 
@@ -238,12 +239,22 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
   const keyword = Math.max(0, Math.min(10, judgeResult.keyword_score ?? 0));
   const mappedAccuracy = semantic + keyword;
 
-  const mappedFormat = Math.max(0, Math.min(20, judgeResult.structural_score ?? 0));
-  const mappedBrevity = token_efficiency + speed_efficiency;
+  const rawFormat = Math.max(0, Math.min(20, judgeResult.structural_score ?? 0));
+  const rawBrevity = token_efficiency + speed_efficiency;
+
+  // Scale format and brevity by accuracy ratio (out of 50)
+  const accuracyRatio = mappedAccuracy / 50;
+  const mappedFormat = Math.round(rawFormat * accuracyRatio);
+  const mappedBrevity = Math.round(rawBrevity * accuracyRatio);
 
   const total = mappedAccuracy + mappedFormat + mappedBrevity;
 
   const { waterMl, co2Grams } = estimateResources({ input_tokens: sandbox.promptTokens, output_tokens: sandbox.completionTokens });
+
+  let justification = judgeResult.justification;
+  if (mappedAccuracy === 0) {
+    justification = `The generated sandbox output is completely irrelevant or senseless. Format and brevity scores are penalized to 0. Detailed reason: ${justification}`;
+  }
 
   return {
     accuracy: mappedAccuracy,
@@ -252,30 +263,64 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
     total,
     waterMl,
     co2Grams,
-    justification: judgeResult.justification,
+    justification,
     feedback: judgeResult.player_feedback,
   };
 }
 
-function fallbackScore(userPrompt: string) {
+function fallbackScore(userPrompt: string, targetOutput: string = "") {
   const cleanPrompt = userPrompt.trim();
   if (cleanPrompt.length < 10 || ["hi", "hello", "test", "hey", "prompt"].includes(cleanPrompt.toLowerCase())) {
     return {
       accuracy: 0,
       format: 0,
-      brevity: 100,
-      total: 100,
+      brevity: 0,
+      total: 0,
       waterMl: 1,
       co2Grams: 0.01,
+      justification: "Your prompt is too short or generic to execute.",
+      feedback: "Try writing a prompt with specific instructions and subject matter."
     };
   }
 
-  const brevity = cleanPrompt.length < 80 ? 80 : cleanPrompt.length < 150 ? 60 : 40;
+  // Check relevance by word overlap (filter out short words < 4 chars)
+  if (targetOutput.trim()) {
+    const promptWords = new Set(cleanPrompt.toLowerCase().split(/\W+/).filter(w => w.length > 3));
+    const targetWords = new Set(targetOutput.toLowerCase().split(/\W+/).filter(w => w.length > 3));
+    
+    let overlapCount = 0;
+    for (const word of promptWords) {
+      if (targetWords.has(word)) {
+        overlapCount++;
+      }
+    }
+
+    if (overlapCount === 0) {
+      return {
+        accuracy: 0,
+        format: 0,
+        brevity: 0,
+        total: 0,
+        waterMl: 1,
+        co2Grams: 0.01,
+        justification: "The prompt has no relevance to the challenge subject matter.",
+        feedback: "Make sure you include topic keywords from the target output in your prompt.",
+      };
+    }
+  }
+
+  const rawBrevity = cleanPrompt.length < 80 ? 30 : cleanPrompt.length < 150 ? 20 : 10;
   
   const hasVerbs = /\b(write|create|generate|explain|list|describe|act|role|format|output|show)\b/i.test(cleanPrompt);
   
-  const accuracy = hasVerbs ? (40 + Math.floor(Math.random() * 20)) : (10 + Math.floor(Math.random() * 15));
-  const format = hasVerbs ? (40 + Math.floor(Math.random() * 20)) : (10 + Math.floor(Math.random() * 15));
+  const accuracy = hasVerbs ? (25 + Math.floor(Math.random() * 15)) : (5 + Math.floor(Math.random() * 10));
+  const rawFormat = hasVerbs ? (10 + Math.floor(Math.random() * 8)) : (2 + Math.floor(Math.random() * 6));
+  
+  // Scale format and brevity by accuracy ratio
+  const accuracyRatio = accuracy / 50;
+  const format = Math.round(rawFormat * accuracyRatio);
+  const brevity = Math.round(rawBrevity * accuracyRatio);
+  const total = accuracy + format + brevity;
   
   // Calculate mock resources dynamically based on prompt length
   const totalEstTokens = Math.round(cleanPrompt.length / 4) + 100;
@@ -285,9 +330,11 @@ function fallbackScore(userPrompt: string) {
     accuracy,
     format,
     brevity,
-    total: accuracy + format + brevity,
+    total,
     waterMl,
     co2Grams,
+    justification: "Busy server fallback grading applied.",
+    feedback: "Focus on adding clear instructions and output structure directives."
   };
 }
 
@@ -307,10 +354,12 @@ app.post("/make-server-488928a2/score", async (c) => {
       return c.json({
         accuracy: 0,
         format: 0,
-        brevity: 100,
-        total: 100,
+        brevity: 0,
+        total: 0,
         waterMl: 1,
         co2Grams: 0.01,
+        justification: "Your prompt is too short or generic to execute in the sandbox.",
+        feedback: "Try writing a prompt with specific instructions and subject matter.",
         idealPrompt: challenge.ideal_prompt,
       });
     }
@@ -329,12 +378,16 @@ app.post("/make-server-488928a2/score", async (c) => {
     }
     const { challengeId, userPrompt } = await c.req.json().catch(() => ({}));
     let idealPrompt = "";
+    let targetOutput = "";
     if (challengeId) {
       const challenge = await getChallengeFromDb(challengeId).catch(() => null);
-      if (challenge) idealPrompt = challenge.ideal_prompt;
+      if (challenge) {
+        idealPrompt = challenge.ideal_prompt;
+        targetOutput = challenge.target_output;
+      }
     }
     return c.json({
-      ...fallbackScore(userPrompt || ""),
+      ...fallbackScore(userPrompt || "", targetOutput),
       idealPrompt,
       debugError: err.message || String(err),
     });
@@ -354,10 +407,12 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
       return c.json({
         accuracy: 0,
         format: 0,
-        brevity: 100,
-        total: 100,
+        brevity: 0,
+        total: 0,
         waterMl: 1,
         co2Grams: 0.01,
+        justification: "Your prompt is too short or generic to execute in the sandbox.",
+        feedback: "Try writing a prompt with specific instructions and subject matter.",
         idealPrompt: challenge.ideal_prompt,
       });
     }
@@ -373,12 +428,16 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
     console.error("Scoring error (guest route):", err);
     const { challengeId, userPrompt } = await c.req.json().catch(() => ({}));
     let idealPrompt = "";
+    let targetOutput = "";
     if (challengeId) {
       const challenge = await getChallengeFromDb(challengeId).catch(() => null);
-      if (challenge) idealPrompt = challenge.ideal_prompt;
+      if (challenge) {
+        idealPrompt = challenge.ideal_prompt;
+        targetOutput = challenge.target_output;
+      }
     }
     return c.json({
-      ...fallbackScore(userPrompt || ""),
+      ...fallbackScore(userPrompt || "", targetOutput),
       idealPrompt,
       debugError: err instanceof Error ? err.message : String(err),
     });

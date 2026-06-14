@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
-import { calculateAndUpdateStreak } from "../lib/streak";
+import { supabase } from "./lib/supabase";
+import { calculateAndUpdateStreak } from "./lib/streak";
 import { LearnPanel } from "./components/LearnPanel";
 import { LeaderboardModal } from "./components/LeaderboardModal";
 import { Topbar } from "./components/Topbar";
-import { useGameState } from "../hooks/useGameState";
-import { scorePrompt, simulateScore, mockScore } from "../lib/scorer";
-import type { ScoreResult } from "../lib/scorer";
-import { safeStorage } from "../lib/safeStorage";
-import { loadChallenge } from "../lib/gameUtils";
+import { useGameState } from "./hooks/useGameState";
+import { scorePrompt, simulateScore, mockScore } from "./lib/scorer";
+import type { ScoreResult } from "./lib/scorer";
+import { safeStorage } from "./lib/safeStorage";
+import { loadChallenge } from "./lib/gameUtils";
+import { motion, AnimatePresence } from "motion/react";
+import { AnimatedGridBackground } from "./components/AnimatedGridBackground";
+import { soundManager } from "./lib/sounds";
 
 // ─── screens ──────────────────────────────────────────────────────────────────
 import { AlreadyPlayed } from "./screens/AlreadyPlayed";
@@ -93,6 +96,7 @@ export default function App() {
   );
 
   const [userPrompt, setUserPrompt] = useState("");
+  const [isInitializing, setIsInitializing] = useState(true);
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [idealPrompt, setIdealPrompt] = useState("");
   const [showAutoIdeal, setShowAutoIdeal] = useState(false);
@@ -248,7 +252,15 @@ export default function App() {
         }
       }
 
-      transitionToState(hasPlayed ? "already-played" : "challenge");
+      if (document.startViewTransition) {
+        document.startViewTransition(() => {
+          setIsInitializing(false);
+          setGameState(hasPlayed ? "already-played" : "challenge");
+        });
+      } else {
+        setIsInitializing(false);
+        setGameState(hasPlayed ? "already-played" : "challenge");
+      }
     })();
   }, [session, difficulty, sessionLoading]);
 
@@ -267,6 +279,7 @@ export default function App() {
 
   const handleSubmit = async () => {
     if (!userPrompt.trim() || !challenge) return;
+    soundManager.playScan();
     transitionToState("loading");
 
     let result: ScoreResult;
@@ -297,7 +310,7 @@ export default function App() {
       const newStreak = await calculateAndUpdateStreak(session.user.id);
       setStreak(newStreak);
     } else {
-      result = await simulateScore(userPrompt, challenge.id);
+      result = await simulateScore(userPrompt, challenge.id, challenge.target_output || (challenge as any).targetOutput);
 
       const today = new Date().toISOString().split("T")[0];
       saveLocalScore({
@@ -324,6 +337,13 @@ export default function App() {
     setPersonalSavings((prev) => ({ waterMl: prev.waterMl + savedWaterThisTurn, co2Grams: prev.co2Grams + savedCo2ThisTurn }));
     setCommunitySavings((prev) => ({ waterLiters: prev.waterLiters + (savedWaterThisTurn / 1000), co2Kg: prev.co2Kg + (savedCo2ThisTurn / 1000) }));
     setHasPlayedToday(true);
+
+    soundManager.stopScan();
+    if (result.total >= 80) {
+      soundManager.playVictory();
+    } else {
+      soundManager.playThud();
+    }
 
     transitionToState("results");
     setTimeout(() => setAnimateScore(true), 100);
@@ -399,71 +419,142 @@ export default function App() {
 
   const contentStyle: React.CSSProperties = {
     fontFamily: "Space Grotesk, system-ui, sans-serif",
-    background: "var(--ps-background)",
+    background: "transparent",
     color: "var(--ps-text-primary)",
     minHeight: "100vh",
     padding: "24px",
-    transition: "background 1.5s ease-in-out",
     boxSizing: "border-box",
+    position: "relative",
+    zIndex: 1,
   };
 
   // ── main flow ─────────────────────────────────────────────────────────────────
   return (
     <>
+      <AnimatedGridBackground />
       {topbar}
       <div style={contentStyle}>
         <div style={{ maxWidth: "500px", margin: "0 auto" }}>
 
-          {/* Landing: no active play session */}
-          {gameState === "challenge" && !isPlayingStarted && (
-            <LandingScreen
-              difficulty={difficulty}
-              hasPlayedToday={hasPlayedToday}
-              onDifficultyChange={handleDifficultyChange}
-              onPlay={() => { setIsPlayingStarted(true); }}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            {/* Initializing check */}
+            {isInitializing && (
+              <motion.div
+                key="initializing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "calc(100vh - 180px)",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    border: "3px solid var(--ps-teal)",
+                    borderRadius: "50%",
+                    borderTopColor: "transparent",
+                    animation: "spin 1s linear infinite",
+                  }}
+                />
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                <div style={{ marginTop: "16px", color: "var(--ps-text-secondary)", fontSize: "14px", fontFamily: "var(--ps-font-mono)" }}>
+                  Nice — better than doomscrolling
+                </div>
+              </motion.div>
+            )}
 
-          {/* Already played */}
-          {gameState === "already-played" && (
-            <AlreadyPlayed
-              score={score}
-              challenge={challenge}
-              personalSavings={personalSavings}
-              communitySavings={communitySavings}
-              userPrompt={userPrompt}
-              idealPrompt={idealPrompt}
-            />
-          )}
+            {/* Landing: no active play session */}
+            {!isInitializing && gameState === "challenge" && !isPlayingStarted && (
+              <motion.div
+                key="landing"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+              >
+                <LandingScreen
+                  difficulty={difficulty}
+                  hasPlayedToday={hasPlayedToday}
+                  onDifficultyChange={handleDifficultyChange}
+                  onPlay={() => { setIsPlayingStarted(true); }}
+                />
+              </motion.div>
+            )}
 
-          {/* Active challenge / loading */}
-          {isPlayingStarted && (
-            <ChallengeScreen
-              challenge={challenge}
-              gameState={gameState}
-              userPrompt={userPrompt}
-              isLoading={!challenge}
-              onPromptChange={setUserPrompt}
-              onSubmit={handleSubmit}
-              onBack={handleBackToMenu}
-            />
-          )}
+            {/* Already played */}
+            {!isInitializing && gameState === "already-played" && (
+              <motion.div
+                key="already-played"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+              >
+                <AlreadyPlayed
+                  score={score}
+                  challenge={challenge}
+                  personalSavings={personalSavings}
+                  communitySavings={communitySavings}
+                  userPrompt={userPrompt}
+                  idealPrompt={idealPrompt}
+                />
+              </motion.div>
+            )}
 
-          {/* Results + impact */}
-          {(gameState === "results" || gameState === "impact") && score && (
-            <ResultsScreen
-              score={score}
-              gameState={gameState}
-              animateScore={animateScore}
-              showAutoIdeal={showAutoIdeal}
-              idealPrompt={idealPrompt}
-              userPrompt={userPrompt}
-              personalSavings={personalSavings}
-              communitySavings={communitySavings}
-              onShare={handleShare}
-              onBackToMenu={handleBackToMenu}
-            />
-          )}
+            {/* Active challenge / loading */}
+            {!isInitializing && isPlayingStarted && (gameState === "challenge" || gameState === "loading") && (
+              <motion.div
+                key="challenge"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+              >
+                <ChallengeScreen
+                  challenge={challenge}
+                  gameState={gameState}
+                  userPrompt={userPrompt}
+                  isLoading={!challenge}
+                  onPromptChange={setUserPrompt}
+                  onSubmit={handleSubmit}
+                  onBack={handleBackToMenu}
+                />
+              </motion.div>
+            )}
+
+            {/* Results + impact */}
+            {!isInitializing && (gameState === "results" || gameState === "impact") && score && (
+              <motion.div
+                key="results"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+              >
+                <ResultsScreen
+                  score={score}
+                  gameState={gameState}
+                  animateScore={animateScore}
+                  showAutoIdeal={showAutoIdeal}
+                  idealPrompt={idealPrompt}
+                  userPrompt={userPrompt}
+                  personalSavings={personalSavings}
+                  communitySavings={communitySavings}
+                  challenge={challenge}
+                  onShare={handleShare}
+                  onBackToMenu={handleBackToMenu}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
         </div>
       </div>

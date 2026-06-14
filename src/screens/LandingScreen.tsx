@@ -1,4 +1,17 @@
+import { soundManager } from "../lib/sounds";
+
 type GameState = "challenge" | "loading" | "results" | "impact" | "already-played";
+
+import { useCountdownToMidnight } from "../hooks/useCountdownToMidnight";
+
+function CountdownTimer() {
+  const { h, m, s } = useCountdownToMidnight();
+  return (
+    <div style={{ fontSize: "20px", color: "var(--ps-text-primary)", fontWeight: 700, fontFamily: "var(--ps-font-mono)", letterSpacing: "1px" }}>
+      {h}h {String(m).padStart(2, "0")}m {String(s).padStart(2, "0")}s
+    </div>
+  );
+}
 
 interface LandingScreenProps {
   difficulty: string;
@@ -56,7 +69,10 @@ export function LandingScreen({
       </div>
 
       <p style={{ fontSize: "var(--ps-text-body)", color: "var(--ps-text-secondary)", maxWidth: "320px", lineHeight: "1.6", marginBottom: "32px" }}>
-        Can you shoot a perfect prompt??   Stop chatting with AI like it's your therapist and get the output in one clean shot. Thirsty data centers are counting on you.
+        Can you shoot a perfect prompt??
+        <br />
+        <br />
+        Stop chatting with AI like it's your therapist and get the output in one clean shot. Thirsty data centers are counting on you.
       </p>
 
       {/* Difficulty selector */}
@@ -64,13 +80,16 @@ export function LandingScreen({
         <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "var(--ps-font-mono)", marginBottom: "8px", textAlign: "center" }}>
           Select Level
         </div>
-        <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--ps-border)", borderRadius: "24px", padding: "4px", gap: "4px" }}>
+        <div className="ps-glass-panel" style={{ display: "flex", background: "rgba(255, 255, 255, 0.01)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "24px", padding: "4px", gap: "4px" }}>
           {(["BEGINNER", "PRO", "EXPERT"] as const).map((d) => {
             const isSelected = difficulty === d;
             return (
               <button
                 key={d}
-                onClick={() => onDifficultyChange(d)}
+                onClick={() => {
+                  soundManager.playClick();
+                  onDifficultyChange(d);
+                }}
                 style={{
                   flex: 1,
                   height: "32px",
@@ -95,29 +114,35 @@ export function LandingScreen({
 
       {/* CTA buttons */}
       {hasPlayedToday ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", alignItems: "center" }}>
-          <button
-            disabled
-            style={{
-              width: "100%",
-              maxWidth: "280px",
-              height: "52px",
-              background: "rgba(255, 255, 255, 0.05)",
-              color: "var(--ps-text-secondary)",
-              border: "1px solid var(--ps-border)",
-              borderRadius: "8px",
-              fontSize: "16px",
-              fontWeight: 700,
-              cursor: "not-allowed",
-              fontFamily: "Space Grotesk"
-            }}
-          >
-            Already Played Today
-          </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", alignItems: "center", marginBottom: "24px" }}>
+          <div style={{ 
+            display: "inline-flex", 
+            alignItems: "center", 
+            gap: "6px", 
+            padding: "6px 16px", 
+            borderRadius: "9999px", 
+            border: "1px solid var(--ps-teal)", 
+            color: "var(--ps-teal)", 
+            fontSize: "13px", 
+            fontWeight: 500,
+            marginBottom: "8px",
+            fontFamily: "Space Grotesk"
+          }}>
+            <span>✓</span> You already played today
+          </div>
+
+          <div style={{ fontSize: "14px", color: "var(--ps-text-secondary)", marginBottom: "4px", fontFamily: "Space Grotesk" }}>
+            come back tomorrow~
+          </div>
+
+          <CountdownTimer />
         </div>
       ) : (
         <button
-          onClick={onPlay}
+          onClick={() => {
+            soundManager.playClick();
+            onPlay();
+          }}
           style={{ width: "100%", maxWidth: "280px", height: "52px", background: "var(--ps-amber)", color: "#000", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: 700, cursor: "pointer", transition: "transform 0.15s ease", fontFamily: "Space Grotesk" }}
           onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
           onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
@@ -127,8 +152,7 @@ export function LandingScreen({
       )}
 
       <div style={{ marginTop: "40px", fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontFamily: "var(--ps-font-mono)", lineHeight: "1.6" }}>
-        💡 Fun Fact: Every sloppy, wordy prompt makes an AI server sweat and drink more water.<br />
-        <span style={{ color: "var(--ps-teal)", fontWeight: 600 }}>Teal tracks Eco-savings</span> · <span style={{ color: "var(--ps-amber)", fontWeight: 600 }}>Amber tracks your Score</span>
+        💡 Fun Fact: Every sloppy, wordy prompt makes an AI server sweat and drink more water.
       </div>
     </div>
   );

@@ -96,28 +96,16 @@ CREATE POLICY "Allow authenticated users to insert their own scores"
 -- Seed Initial Challenges
 -- ============================================================================
 INSERT INTO public.challenges (id, category, difficulty, target_output, ideal_prompt, char_count, active) VALUES
-('001', 'PARAGRAPH', 'BEGINNER', 'The water cycle, also known as the hydrological cycle, describes the continuous movement of water through Earth''s systems. Water evaporates from oceans and lakes, rises as vapor, condenses into clouds, and falls as precipitation. This process distributes fresh water across the planet and regulates global temperature.', 'Explain the water cycle in 3 sentences. Include: evaporation, condensation, and precipitation. Keep it factual and concise.', 312, true),
-('002', 'CODE', 'PRO', 'function debounce(fn, delay) {
-  let timer;
-  return function(...args) {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn.apply(this, args), delay);
-  };
-}', 'Write a JavaScript debounce function. It should accept a function and delay in ms, return a new function that clears and resets a timer on each call, and execute the original function after the delay.', 148, true),
-('003', 'LIST', 'EXPERT', 'Principles of effective feedback:
-• Specific over general — cite the exact behavior
-• Timely — given close to the event
-• Actionable — the receiver can do something with it
-• Separates behavior from identity — ''this report was unclear'' not ''you are unclear''
-• Two-way — invites response', 'List the principles of effective feedback as bullet points. Each should be a short label followed by a one-sentence explanation. Include: specificity, timing, actionability, behavior vs identity, and dialogue.', 328, true),
-('004', 'ROLE', 'PRO', 'As your interview coach, focus on three things: tighten the opening story, quantify the project impact, and prepare one recovery answer for mistakes. Practice aloud twice, then trim anything that sounds memorized.', 'Act as an interview coach. Give concise advice for improving a software engineer''s behavioral interview answer. Include exactly 3 focus areas plus one practice instruction. Sound direct and supportive.', 214, true),
-('005', 'TONE', 'BEGINNER', 'Thanks for sending this over. I can review it by Friday afternoon. If you need a faster turnaround, please send the two sections you want prioritized and I will look at those first.', 'Write a polite but firm reply to a coworker asking for a document review. Say you can review it by Friday afternoon. If they need it sooner, ask them to send the two priority sections first.', 181, true),
-('006', 'CONSTRAINTS', 'EXPERT', 'Urban balcony garden checklist:
-• 6+ hours of light
-• Containers with drainage
-• Lightweight potting mix
-• Herbs or compact greens
-• Watering plan for hot days
-Avoid: invasive plants, heavy soil, and pesticide sprays.', 'Create a balcony garden checklist for a city apartment. Use bullet points. Include light, containers, soil, plant choices, and watering. Add an Avoid line with invasive plants, heavy soil, and pesticide sprays.', 222, true),
-('007', 'PARAGRAPH', 'PRO', 'A transformer is an AI architecture that reads words in relation to one another instead of one at a time. That lets it notice which words matter most in a sentence, even when they are far apart. This is why modern chatbots can follow context across longer questions.', 'Explain what a transformer is in 3 sentences for a curious high school student. Avoid equations. Emphasize attention, relationships between words, and why it helps chatbots follow context.', 274, true)
+('001', 'TONE', 'BEGINNER', 'Hi Dave, thanks for the invite. Since my calendar is fully booked this week, could you send over the key questions or agenda via Slack/email? I''ll review them and reply asynchronously by end of day today so we can save time.', 'Write a polite but direct response to a coworker named Dave, declining a sync invite because your calendar is booked. Ask him to send the agenda/questions via Slack/email instead, and promise an async reply by end of day. Keep it under 45 words.', 218, true),
+('002', 'CODE', 'PRO', 'Hey team, my local branch is out of sync after an interactive rebase mismatch. I am force-pushing the origin branch from yesterday to reset it. No other branches are affected, and I will have the clean PR ready in 30 minutes.', 'Write a brief Slack update to your dev team. Explain that your branch is out of sync due to a rebase mismatch, you are force-pushing yesterday''s origin branch to reset it, and no other branches are affected. State the PR will be ready in 30 minutes. Keep it professional and direct.', 224, true),
+('003', 'CONSTRAINTS', 'EXPERT', 'Translation: I was laid off along with 15% of the staff. The corporate pivot failed, the culture was toxic, and my equity is worth zero. I am now unemployed and looking for a job that pays actual money.', 'Translate a hype-filled corporate announcement into a raw, brutally honest summary: mention being laid off in a 15% cut, the failed corporate pivot, toxic culture, worthless equity, and looking for a new role. Prefix with ''Translation: ''.', 204, true),
+('004', 'ROLE', 'PRO', 'Listen up, champ! Those failing unit tests are just mental blocks. We don''t skip debug day. Put your developer belt on, stack those print statements, and push that refactored commit. No excuses, let''s get those green checkmarks!', 'Act as a passionate, hyperactive gym bro personal trainer. Write a short motivational paragraph urging a software developer to fix their failing unit tests. Use phrases like ''debug day'', ''green checkmarks'', and ''no excuses''.', 226, true),
+('005', 'LIST', 'BEGINNER', 'Survival Checklist:
+1. Mute button checked twice (safety first)
+2. Camera on ''thoughtful nod'' loop
+3. Coffee mug filled to the brim
+4. Dual-monitor setup hides actual work
+5. Pre-drafted Slack update ready for the end', 'Create a 5-item survival checklist for surviving a long, boring Zoom meeting. Use bullet numbers. Focus on mute checks, camera nods, coffee, hiding work, and pre-drafted status updates. Start with the title ''Survival Checklist:''.', 216, true),
+('006', 'TONE', 'EXPERT', 'Dear Landlord, this is a formal notice regarding active water damage in the living room ceiling. Per state tenancy guidelines, this requires urgent mitigation to prevent structural mold. Please confirm when the repair team will arrive today.', 'Write a formal email notice to your landlord about active ceiling water damage. Reference state tenancy guidelines, request urgent mitigation to prevent mold, and ask for repair confirmation today. Sound firm, legal, and professional.', 243, true),
+('007', 'TONE', 'PRO', 'Hi team, I am following up on invoice #1042 which is now 60 days overdue. Please reply with the payment confirmation status by Friday. A late fee of 5% will be applied starting next week per our contract terms.', 'Write a professional follow-up email to a client for invoice #1042 that is 60 days overdue. Request a payment confirmation status by Friday. Mention a 5% late fee starting next week based on contract terms. Keep it direct and firm.', 212, true)
 ON CONFLICT (id) DO NOTHING;

@@ -15,7 +15,7 @@
   --ps-text-secondary:#4A6B4A;
   --ps-text-muted:    #2E4F31;
   --ps-mint:          #6EE09B;
-  --ps-teal:          #14B8A6;
+  --ps-teal:          #0EA79A;
   --ps-amber:         #F59E0B;
   --ps-red:           #FF5F5F;
   --ps-border:        #243B27;
@@ -179,6 +179,51 @@
 
 @keyframes wave-spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── Glassmorphism Design System ─────────────────────────────────────────── */
+.ps-glass-panel {
+  background: rgba(18, 28, 20, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(110, 224, 155, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.ps-glass-panel:hover {
+  border-color: rgba(110, 224, 155, 0.18);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), 0 0 15px rgba(20, 184, 166, 0.05);
+}
+
+.ps-glass-panel-amber {
+  background: rgba(26, 22, 10, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(245, 158, 11, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.ps-glass-panel-amber:hover {
+  border-color: rgba(245, 158, 11, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), 0 0 15px rgba(245, 158, 11, 0.05);
+}
+
+/* ── Split Diff Editor Layout ────────────────────────────────────────────── */
+.ps-diff-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .ps-diff-container {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* ── Accessibility: respect prefers-reduced-motion ───────────────────────── */

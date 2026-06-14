@@ -1,77 +1,68 @@
-# Project Setup
+# Project Setup & Configuration
 
-## Stack
-React 18 + TypeScript, Tailwind CSS v3, Vite. Single page app, no router needed.
+This guide details the tech stack, API integrations, state storage, and challenge loading structure implemented in **PromptShot**.
 
-## Fonts
-Load Inter from Google Fonts in index.html:
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-```
-Set in tailwind.config: fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+---
 
-## Score mock function
-IMPORTANT: Do NOT call any external API. Use this mock in src/lib/scorer.ts:
+## 1. Stack & Dependencies
 
-```typescript
-export interface ScoreResult {
-  accuracy: number;   // 0–100
-  format: number;     // 0–100
-  brevity: number;    // 0–100
-  total: number;      // sum of above
-  waterMl: number;    // 10 per API call
-  co2Grams: number;   // 0.1 per API call
-}
+* **Core**: React 18 + TypeScript + Vite.
+* **Styling**: Tailwind CSS v4 (using the `@tailwindcss/vite` plugin).
+* **Routing**: None. Navigation is managed via state-driven screen transitions (`gameState` enum in `App.tsx`).
+* **Database & Hosting**: Supabase for authentication, profiles, scores, and Edge Functions.
 
-export async function simulateScore(
-  userPrompt: string, 
-  targetOutput: string
-): Promise<ScoreResult> {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1200));
-  
-  // Brevity score based on prompt length — shorter = higher
-  const brevity = Math.max(20, Math.min(100, Math.round(120 - userPrompt.length * 0.4)));
-  
-  // Mock accuracy and format
-  const accuracy = 65 + Math.floor(Math.random() * 25);
-  const format = 70 + Math.floor(Math.random() * 20);
-  
-  return {
-    accuracy,
-    format, 
-    brevity,
-    total: accuracy + format + brevity,
-    waterMl: 10,
-    co2Grams: 0.1
-  };
-}
-```
+---
 
+## 2. Scoring API & Fallback Scorer
 
-## localStorage keys
-```typescript
-const STORAGE_KEYS = {
-  STREAK: 'promptshot_streak',
-  LAST_PLAYED: 'promptshot_last_played',
-  HISTORY: 'promptshot_history'
-} as const;
-```
+The application uses a hybrid scoring pipeline. For authenticated or guest runs, it calls the backend Edge Functions, falling back to a programmatic scorer if offline.
 
-Write a useGameState hook in src/hooks/useGameState.ts that reads/writes these.
+### Standard Scorer Call
+* **Endpoints**: 
+  - Authenticated: `https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2/score`
+  - Anonymous / Guest: `https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2/score-guest`
+* **Response Schema**: Returns a 100-point scale result:
+  ```typescript
+  export interface ScoreResult {
+    accuracy: number;   // 0–50 (Semantic + Keyword)
+    format: number;     // 0–20 (Structural layout)
+    brevity: number;    // 0–30 (Token + Latency, scaled by accuracy)
+    total: number;      // sum of above (0-100)
+    waterMl: number;    // Estimated server water footprint
+    co2Grams: number;   // Estimated server carbon footprint
+    idealPrompt?: string;
+    justification?: string;
+    feedback?: string;
+  }
+  ```
 
-## Challenge selection
-Pick today's challenge in src/lib/challenges.ts:
-```typescript
-function getTodaysChallenge() {
-  const dayOfYear = getDayOfYear(new Date());
-  return DAILY_CHALLENGES[dayOfYear % DAILY_CHALLENGES.length];
-}
-```
+### Local Fallback Scoring
+If the server is offline, the client uses `mockScore(userPrompt, targetOutput)` in `src/lib/scorer.ts` to perform a programmatic estimation:
+- **Relevance Check**: Checks for keyword overlap between prompt and target. If zero keywords overlap, all scores evaluate directly to `0`.
+- **Scaling**: Raw format and brevity scores are scaled by the accuracy ratio to penalize irrelevant or absurd prompts.
 
-## Rules
-- Do NOT add any other npm packages unless explicitly asked
-- Do NOT add React Router or any routing library
-- Do NOT connect to any external API in v1 — scorer is mocked
-- The simulateScore interface (inputs/outputs) must stay exactly as defined above
+---
+
+## 3. Challenge Loading System
+
+Challenges are loaded dynamically from the backend and fall back to local seed data if needed.
+
+1. **Dynamic Path (Default)**:
+   Loads from `GET /challenge?difficulty=BEGINNER|PRO|EXPERT`. The backend edge function fetches the daily AI-generated challenge for that date.
+2. **Local Fallback (Offline)**:
+   If the edge function is offline, the client loads from `DAILY_CHALLENGES` in [`src/data/challenges.ts`](file:///Users/smriti/Documents/GitHub/promptshot/src/data/challenges.ts) using the day-of-year mod index.
+
+---
+
+## 4. State & Storage Integration
+
+PromptShot uses a dual storage paradigm depending on user session state:
+
+### Signed-In Mode (Supabase)
+* **Auth**: Managed asynchronously via Supabase client auth hooks.
+* **Scores & Streaks**: Persisted in the `profiles` and `scores` Postgres tables. Streaks are calculated and synced live.
+
+### Guest Mode (LocalStorage)
+* **Streak**: `promptshot_streak` (integer)
+* **Last Played**: `promptshot_last_played` (ISO date string)
+* **History**: `promptshot_history` (JSON array of previous attempts)

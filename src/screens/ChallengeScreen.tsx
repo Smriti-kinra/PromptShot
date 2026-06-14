@@ -1,6 +1,7 @@
-import type { Challenge } from "../../lib/supabase";
-import { getBrevityColor } from "../../lib/gameUtils";
+import type { Challenge } from "../lib/supabase";
+import { getBrevityColor } from "../lib/gameUtils";
 import { LoadingSkeleton } from "../components/LoadingSkeleton";
+import { soundManager } from "../lib/sounds";
 
 interface ChallengeScreenProps {
   challenge: Challenge | null;
@@ -25,7 +26,10 @@ export function ChallengeScreen({
     <>
       {/* Back button */}
       <button
-        onClick={onBack}
+        onClick={() => {
+          soundManager.playClick();
+          onBack();
+        }}
         style={{
           background: "none",
           border: "none",
@@ -59,11 +63,8 @@ export function ChallengeScreen({
 
       {/* Target output card */}
       {challenge && (
-        <div style={{ background: "var(--ps-surface)", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
+        <div className="ps-glass-panel" style={{ padding: "24px", marginBottom: "24px", background: "rgba(18, 28, 20, 0.4)" }}>
           <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-            <span style={{ background: "var(--ps-teal)", color: "#000", padding: "4px 12px", borderRadius: "9999px", fontSize: "var(--ps-text-caption)", fontWeight: 600 }}>
-              {challenge.category}
-            </span>
             <span style={{ background: "rgba(245,158,11,0.15)", color: "var(--ps-amber)", padding: "4px 12px", borderRadius: "9999px", fontSize: "var(--ps-text-caption)", fontWeight: 600 }}>
               {challenge.difficulty}
             </span>
@@ -101,7 +102,10 @@ export function ChallengeScreen({
           </div>
           <textarea
             value={userPrompt}
-            onChange={(e) => onPromptChange(e.target.value)}
+            onChange={(e) => {
+              onPromptChange(e.target.value);
+              soundManager.playClick();
+            }}
             placeholder="Describe exactly what you want the AI to produce..."
             style={{
               width: "100%",
@@ -118,16 +122,16 @@ export function ChallengeScreen({
               boxSizing: "border-box",
             }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", marginBottom: "16px" }}>
             <span style={{ fontSize: "var(--ps-text-caption)", color: getBrevityColor(userPrompt.length) }}>
               {userPrompt.length} characters
             </span>
-            <span style={{ fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)" }}>
-              Shorter prompts score higher on brevity
-            </span>
           </div>
           <button
-            onClick={onSubmit}
+            onClick={() => {
+              soundManager.playClick();
+              onSubmit();
+            }}
             disabled={!userPrompt.trim()}
             style={{
               width: "100%",
@@ -139,7 +143,15 @@ export function ChallengeScreen({
               fontSize: "var(--ps-text-body)",
               fontWeight: 600,
               cursor: userPrompt.trim() ? "pointer" : "not-allowed",
-              transition: "background 0.2s",
+              transition: "background 0.2s, transform 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (userPrompt.trim()) {
+                e.currentTarget.style.transform = "scale(1.01)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
             }}
           >
             Shoot →
@@ -163,7 +175,7 @@ export function ChallengeScreen({
           />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <div style={{ color: "var(--ps-text-secondary)", fontSize: "var(--ps-text-secondary-size)" }}>
-            Analyzing your shot...
+            Shooting your prompt...
           </div>
         </div>
       )}
