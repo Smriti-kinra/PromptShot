@@ -231,6 +231,7 @@ export default function App() {
             waterMl: existingScore.water_ml ?? 10,
             co2Grams: existingScore.co2_grams ?? 0.1,
           });
+          if (existingScore.user_prompt) setUserPrompt(existingScore.user_prompt);
         }
       } else {
         const todayEntry = getLocalHistory().find((s) => s.played_at === today);
@@ -243,6 +244,7 @@ export default function App() {
             waterMl: todayEntry.waterMl ?? 10,
             co2Grams: todayEntry.co2Grams ?? 0.1,
           });
+          if (todayEntry.user_prompt) setUserPrompt(todayEntry.user_prompt);
         }
       }
 
@@ -327,7 +329,7 @@ export default function App() {
     setTimeout(() => setAnimateScore(true), 100);
     setTimeout(() => { transitionToState("impact"); }, 2000);
 
-    if (result.total < 210) {
+    if (result.total < 70) {
       setTimeout(() => setShowAutoIdeal(true), 1500);
     }
   };
@@ -337,13 +339,13 @@ export default function App() {
     const dots = "●●●●●"
       .split("")
       .map((_, i) => {
-        const threshold = (i + 1) * 60;
+        const threshold = (i + 1) * 20;
         if (score.total >= threshold) return "●";
-        if (score.total >= threshold - 30) return "◐";
+        if (score.total >= threshold - 10) return "◐";
         return "○";
       })
       .join("");
-    const text = `PromptShot — ${challenge.id}\n${score.total}/300 ${dots}\n💧 ~10ml · ${challenge.difficulty}`;
+    const text = `PromptShot — ${challenge.id}\n${score.total}/100 ${dots}\n💧 ~10ml · ${challenge.difficulty}`;
     const tryClipboard = async () => {
       try {
         await navigator.clipboard.writeText(text);
@@ -395,32 +397,15 @@ export default function App() {
     </>
   );
 
-  const isEcoState = gameState === "impact" || gameState === "results" || gameState === "already-played";
   const contentStyle: React.CSSProperties = {
     fontFamily: "Space Grotesk, system-ui, sans-serif",
-    background: isEcoState ? "#0E1E14" : "var(--ps-background)",
+    background: "var(--ps-background)",
     color: "var(--ps-text-primary)",
     minHeight: "100vh",
     padding: "24px",
     transition: "background 1.5s ease-in-out",
     boxSizing: "border-box",
   };
-
-  // ── already-played flow ───────────────────────────────────────────────────────
-  if (gameState === "already-played") {
-    return (
-      <>
-        {topbar}
-        <AlreadyPlayed
-          score={score}
-          challenge={challenge}
-          personalSavings={personalSavings}
-          communitySavings={communitySavings}
-        />
-        {modals}
-      </>
-    );
-  }
 
   // ── main flow ─────────────────────────────────────────────────────────────────
   return (
@@ -436,6 +421,18 @@ export default function App() {
               hasPlayedToday={hasPlayedToday}
               onDifficultyChange={handleDifficultyChange}
               onPlay={() => { setIsPlayingStarted(true); }}
+            />
+          )}
+
+          {/* Already played */}
+          {gameState === "already-played" && (
+            <AlreadyPlayed
+              score={score}
+              challenge={challenge}
+              personalSavings={personalSavings}
+              communitySavings={communitySavings}
+              userPrompt={userPrompt}
+              idealPrompt={idealPrompt}
             />
           )}
 

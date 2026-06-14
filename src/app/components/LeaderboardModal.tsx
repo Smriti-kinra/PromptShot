@@ -228,7 +228,7 @@ function GateScreen({ onClose }: { onClose: () => void }) {
 
 // ── Score bar ───────────────────────────────────────────────────────────────
 
-function ScoreBar({ label, value, tooltip }: { label: string; value: number; tooltip: string }) {
+function ScoreBar({ label, value, max, tooltip }: { label: string; value: number; max: number; tooltip: string }) {
   return (
     <div title={tooltip} style={{ marginBottom: "8px" }}>
       <div style={{
@@ -239,11 +239,11 @@ function ScoreBar({ label, value, tooltip }: { label: string; value: number; too
         fontFamily: C.font,
       }}>
         <span style={{ color: C.secondary }}>{label}</span>
-        <span style={{ color: C.primary }}>{value}/100</span>
+        <span style={{ color: C.primary }}>{value}/{max}</span>
       </div>
       <div style={{ height: "3px", background: "rgba(255,255,255,0.08)", borderRadius: "9999px", overflow: "hidden" }}>
         <div style={{
-          width: `${value}%`,
+          width: `${(value / max) * 100}%`,
           height: "100%",
           background: C.amber,
           transition: "width 0.6s cubic-bezier(0.25, 0.8, 0.25, 1)",
@@ -326,7 +326,7 @@ function LeaderboardRow({
           textAlign: "right",
         }}>
           {entry.total}
-          <span style={{ fontSize: "10px", color: C.secondary, fontWeight: 400 }}>/300</span>
+          <span style={{ fontSize: "10px", color: C.secondary, fontWeight: 400 }}>/100</span>
         </span>
 
         {/* Expand chevron */}
@@ -347,9 +347,9 @@ function LeaderboardRow({
           padding: "0 12px 14px 50px",
           animation: "none",
         }}>
-          <ScoreBar label="Accuracy" value={entry.accuracy} tooltip="How well the prompt captured the target output semantics" />
-          <ScoreBar label="Format" value={entry.format} tooltip="Whether the output structure matched the target" />
-          <ScoreBar label="Brevity" value={entry.brevity} tooltip="Prompt efficiency — shorter is better" />
+          <ScoreBar label="Accuracy" value={entry.accuracy} max={50} tooltip="Semantic similarity (40 pts) and keyword coverage (10 pts)" />
+          <ScoreBar label="Format" value={entry.format} max={20} tooltip="Structural match and output layout (20 pts)" />
+          <ScoreBar label="Brevity" value={entry.brevity} max={30} tooltip="Green efficiency: token economy and speed (30 pts)" />
 
           {entry.isCurrentUser && entry.userPrompt && (
             <div style={{ marginTop: "10px" }}>

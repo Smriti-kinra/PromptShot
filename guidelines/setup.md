@@ -49,7 +49,6 @@ export async function simulateScore(
 }
 ```
 
-This will be replaced with a real Claude API call later. The interface must not change.
 
 ## localStorage keys
 ```typescript

@@ -20,4 +20,6 @@ export interface Challenge {
   ideal_prompt?: string;
   char_count: number;
   active: boolean;
+  skill?: string;
+  impactLesson?: string;
 }

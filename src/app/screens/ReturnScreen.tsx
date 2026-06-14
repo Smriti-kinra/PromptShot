@@ -22,7 +22,7 @@ export function ReturnScreen({
     <div
       style={{
         fontFamily: "Space Grotesk, system-ui, sans-serif",
-        background: "#0E1E14",
+        background: "var(--ps-background)",
         color: "var(--ps-text-primary)",
         minHeight: "calc(100vh - 56px)",
         display: "flex",
@@ -47,7 +47,7 @@ export function ReturnScreen({
         {/* Subtext */}
         <div style={{ fontSize: "15px", color: "var(--ps-text-secondary)", lineHeight: 1.6, marginBottom: "32px", maxWidth: "320px", margin: "0 auto 32px" }}>
           You've already fired today's round.{" "}
-          {score && <span><br />You scored <strong style={{ color: "var(--ps-amber)" }}>{score.total}/300</strong>. </span>}<br />Come back tomorrow ~
+          {score && <span><br />You scored <strong style={{ color: "var(--ps-amber)" }}>{score.total}/100</strong>. </span>}<br />Come back tomorrow ~
         </div>
 
         {/* Badges */}

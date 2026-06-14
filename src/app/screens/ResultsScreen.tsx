@@ -16,9 +16,9 @@ interface ResultsScreenProps {
 }
 
 const SCORE_BAR_TOOLTIPS = {
-  Accuracy: "Measures how well your prompt captures the required semantic details, meaning, and nuances of the target output.",
-  Format: "Evaluates whether your prompt correctly enforces structural constraints, length limits, styling, and output type specified in the target.",
-  Brevity: "Measures prompt efficiency. Shorter prompts receive higher scores (100 pts for <60 chars, scaling down to 20 pts for >300 chars).",
+  Accuracy: "Measures semantic similarity (40 pts) and keyword coverage (10 pts) against the target output.",
+  Format: "Evaluates whether your prompt correctly enforces structural constraints, length limits, styling, and output type (20 pts).",
+  Brevity: "Measures green efficiency: token economy (15 pts) and latency/speed of execution (15 pts).",
 };
 
 // ── Per-dimension coaching ────────────────────────────────────────────────────
@@ -27,24 +27,25 @@ function getScoreFeedback(
   format: number,
   brevity: number,
 ): { label: string; tip: string; dim: string } {
-  const LOW = 50;
-  const MID = 75;
+  const accPct = (accuracy / 50) * 100;
+  const fmtPct = (format / 20) * 100;
+  const brePct = (brevity / 30) * 100;
 
   const weakest =
-    accuracy <= format && accuracy <= brevity
+    accPct <= fmtPct && accPct <= brePct
       ? "accuracy"
-      : format <= brevity
+      : fmtPct <= brePct
         ? "format"
         : "brevity";
 
   if (weakest === "accuracy") {
-    if (accuracy < LOW)
+    if (accPct < 50)
       return {
         dim: "Accuracy",
         label: "Critical: Meaning missed",
         tip: 'Your prompt didn\'t capture the core content. Add an explicit task verb (e.g. "Write", "List", "Explain") and name the specific subject the output must cover.',
       };
-    if (accuracy < MID)
+    if (accPct < 75)
       return {
         dim: "Accuracy",
         label: "Tip: Add missing details",
@@ -53,13 +54,13 @@ function getScoreFeedback(
   }
 
   if (weakest === "format") {
-    if (format < LOW)
+    if (fmtPct < 50)
       return {
         dim: "Format",
         label: "Critical: No structure specified",
         tip: 'Your prompt gave no formatting instructions. Tell the AI the exact output shape — e.g. "as a numbered list", "in a markdown table", "in 3 sentences", or "as a JSON object".',
       };
-    if (format < MID)
+    if (fmtPct < 75)
       return {
         dim: "Format",
         label: "Tip: Tighten your format constraints",
@@ -68,13 +69,13 @@ function getScoreFeedback(
   }
 
   if (weakest === "brevity") {
-    if (brevity < LOW)
+    if (brePct < 50)
       return {
         dim: "Brevity",
-        label: "Tip: Your prompt is too long",
+        label: "Tip: Your prompt is too long/inefficient",
         tip: "Remove background context the AI already knows, cut filler phrases, and consolidate overlapping constraints. Every unnecessary word increases compute cost.",
       };
-    if (brevity < MID)
+    if (brePct < 75)
       return {
         dim: "Brevity",
         label: "Tip: Trim further",
@@ -287,9 +288,9 @@ export function ResultsScreen({
   onBackToMenu,
 }: ResultsScreenProps) {
   const bars = [
-    { label: "Accuracy", value: score.accuracy, tooltip: SCORE_BAR_TOOLTIPS.Accuracy, r: 85 },
-    { label: "Format", value: score.format, tooltip: SCORE_BAR_TOOLTIPS.Format, r: 60 },
-    { label: "Brevity", value: score.brevity, tooltip: SCORE_BAR_TOOLTIPS.Brevity, r: 35 },
+    { label: "Accuracy", value: score.accuracy, max: 50, tooltip: SCORE_BAR_TOOLTIPS.Accuracy, r: 85 },
+    { label: "Format", value: score.format, max: 20, tooltip: SCORE_BAR_TOOLTIPS.Format, r: 60 },
+    { label: "Brevity", value: score.brevity, max: 30, tooltip: SCORE_BAR_TOOLTIPS.Brevity, r: 35 },
   ];
 
   return (
@@ -297,23 +298,23 @@ export function ResultsScreen({
       {/* Bullseye rings SVG */}
       <div style={{ textAlign: "center", marginBottom: "32px" }}>
         <svg width="200" height="200" viewBox="0 0 200 200" style={{ margin: "0 auto" }}>
-          {bars.map(({ label, value, r }, i) => (
+          {bars.map(({ label, value, max, r }, i) => (
             <g key={label}>
               <circle cx="100" cy="100" r={r} fill="none" stroke="#222" strokeWidth="12" />
               <circle
                 cx="100" cy="100" r={r}
                 fill="none" stroke="var(--ps-amber)" strokeWidth="12"
                 strokeDasharray={`${2 * Math.PI * r}`}
-                strokeDashoffset={`${2 * Math.PI * r * (1 - value / 100)}`}
+                strokeDashoffset={`${2 * Math.PI * r * (1 - value / max)}`}
                 transform="rotate(-90 100 100)"
                 style={{ transition: animateScore ? `stroke-dashoffset 0.8s ease-out ${i * 0.2}s` : "none" }}
               >
-                <title>{label}: {value}/100</title>
+                <title>{label}: {value}/{max}</title>
               </circle>
             </g>
           ))}
           <text x="100" y="95" textAnchor="middle" fill="var(--ps-text-primary)" fontSize="40" fontWeight="600">{score.total}</text>
-          <text x="100" y="115" textAnchor="middle" fill="var(--ps-text-secondary)" fontSize="20">/300</text>
+          <text x="100" y="115" textAnchor="middle" fill="var(--ps-text-secondary)" fontSize="20">/100</text>
         </svg>
         <div style={{ fontSize: "var(--ps-text-subhead)", color: "var(--ps-amber)", marginTop: "16px", fontWeight: 600 }}>
           {getScoreLabel(score.total)}
@@ -327,10 +328,10 @@ export function ResultsScreen({
             <div className="ps-tooltip-text">{item.tooltip}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "var(--ps-text-secondary-size)" }}>
               <span style={{ color: "var(--ps-text-secondary)" }}>{item.label} ⓘ</span>
-              <span style={{ color: "var(--ps-text-primary)" }}>{item.value}/100</span>
+              <span style={{ color: "var(--ps-text-primary)" }}>{item.value}/{item.max}</span>
             </div>
             <div style={{ height: "4px", background: "#222", borderRadius: "9999px", overflow: "hidden" }}>
-              <div style={{ width: `${item.value}%`, height: "100%", background: "var(--ps-amber)", transition: animateScore ? "width 0.6s ease-out" : "none" }} />
+              <div style={{ width: `${(item.value / item.max) * 100}%`, height: "100%", background: "var(--ps-amber)", transition: animateScore ? "width 0.6s ease-out" : "none" }} />
             </div>
           </div>
         ))}
@@ -399,7 +400,7 @@ export function ResultsScreen({
             </div>
 
             {/* Score quality message */}
-            {score.total < 180 ? (
+            {score.total < 60 ? (
               <div style={{ background: "rgba(245,158,11,0.05)", borderLeft: "3px solid var(--ps-amber)", padding: "12px 14px", borderRadius: "6px", marginTop: "4px" }}>
                 <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--ps-amber)", marginBottom: "4px" }}>Why a higher score matters:</div>
                 <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", lineHeight: "1.5" }}>

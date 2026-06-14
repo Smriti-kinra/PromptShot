@@ -5,9 +5,9 @@ import { DAILY_CHALLENGES } from "../app/challenges";
 // ─── score display helpers ─────────────────────────────────────────────────────
 
 export function getScoreLabel(total: number): string {
-  if (total > 240) return "Bullseye 🎯";
-  if (total >= 180) return "On target";
-  if (total >= 120) return "Close range";
+  if (total > 80) return "Bullseye 🎯";
+  if (total >= 60) return "On target";
+  if (total >= 40) return "Close range";
   return "Missed";
 }
 
@@ -54,22 +54,32 @@ export async function loadChallenge(
   difficulty: string,
   selectFields: string
 ): Promise<Challenge | null> {
-  const dayOfYear = getDayOfYear(new Date());
   try {
-    const { data, error } = await supabase
-      .from("challenges")
-      .select(selectFields)
-      .eq("difficulty", difficulty)
-      .eq("active", true)
-      .order("id");
+    const url = `https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2/challenge?difficulty=${difficulty}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Challenge server returned ${res.status}`);
+    const data = await res.json();
 
-    if (error || !data || data.length === 0) {
-      console.warn("Challenges query empty/failed from database, falling back to local dataset.");
-      return getLocalFallbackChallenge(difficulty);
+    const ch: Challenge = {
+      id: data.id,
+      category: data.category,
+      difficulty: data.difficulty,
+      skill: data.skill,
+      impactLesson: data.impactLesson || data.impact_lesson,
+      target_output: data.targetOutput || data.target_output,
+      ideal_prompt: data.idealPrompt || data.ideal_prompt,
+      char_count: data.charCount || data.char_count,
+      active: data.active,
+    };
+
+    // Strict security check: if client has not played today, the prompt request does not include ideal_prompt.
+    if (!selectFields.includes("ideal_prompt")) {
+      delete ch.ideal_prompt;
     }
-    return data[dayOfYear % data.length];
+
+    return ch;
   } catch (err) {
-    console.error("Error loading challenge from Supabase, falling back to local dataset:", err);
+    console.error("Error loading AI generated challenge, falling back to local dataset:", err);
     return getLocalFallbackChallenge(difficulty);
   }
 }

@@ -1,11 +1,13 @@
 export interface ScoreResult {
-  accuracy: number;   // 0–100
-  format: number;     // 0–100
-  brevity: number;    // 0–100
-  total: number;      // sum of above
-  waterMl: number;    // 10 per API call
-  co2Grams: number;   // 0.1 per API call
+  accuracy: number;   // 0–50 (Semantic + Keyword)
+  format: number;     // 0–20 (Structural)
+  brevity: number;    // 0–30 (Token + Latency)
+  total: number;      // sum of above (0-100)
+  waterMl: number;    
+  co2Grams: number;   
   idealPrompt?: string;
+  justification?: string;
+  feedback?: string;
 }
 
 const EDGE_URL =
@@ -15,16 +17,31 @@ const GUEST_SCORE_URL =
   "https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2/score-guest";
 
 export function mockScore(userPrompt: string): ScoreResult {
-  const len = userPrompt.length;
-  const brevity = len < 80 ? 85 : len < 150 ? 65 : 45;
-  const hasStructure = /\b(write|create|generate|explain|list|describe)\b/i.test(userPrompt);
-  const hasDetails = userPrompt.split(/[.,;]/).length > 1;
-  const accuracy = Math.round(
-    hasStructure && hasDetails ? 75 + Math.random() * 20 : 55 + Math.random() * 20,
-  );
-  const format = Math.round(hasStructure ? 70 + Math.random() * 25 : 50 + Math.random() * 20);
+  const cleanPrompt = userPrompt.trim();
+  if (cleanPrompt.length < 10 || ["hi", "hello", "test", "hey", "prompt"].includes(cleanPrompt.toLowerCase())) {
+    return {
+      accuracy: 0,
+      format: 0,
+      brevity: 30,
+      total: 30,
+      waterMl: 1,
+      co2Grams: 0.01,
+      justification: "The prompt was too short or contained only greeting words.",
+      feedback: "Try writing a prompt with specific instructions and formatting guidelines.",
+    };
+  }
+
+  const len = cleanPrompt.length;
+  const brevity = len < 80 ? 25 : len < 150 ? 18 : 10;
+  const hasStructure = /\b(write|create|generate|explain|list|describe|act|role|format|output|show)\b/i.test(cleanPrompt);
   
-  // Dynamic resource estimation for mock score
+  const accuracy = Math.round(
+    hasStructure ? 30 + Math.random() * 15 : 5 + Math.random() * 10
+  );
+  const format = Math.round(
+    hasStructure ? 10 + Math.random() * 8 : 2 + Math.random() * 5
+  );
+  
   const totalEstTokens = Math.round(len / 4) + 100;
   const waterMl = Math.max(1, Math.round(totalEstTokens * 0.033));
   const co2Grams = Math.max(0.01, parseFloat((totalEstTokens * 0.00033).toFixed(3)));
@@ -36,6 +53,8 @@ export function mockScore(userPrompt: string): ScoreResult {
     total: accuracy + format + brevity,
     waterMl,
     co2Grams,
+    justification: "Programmatic evaluation simulation applied.",
+    feedback: "Focus on adding clear instructions and output structure directives.",
   };
 }
 
@@ -65,6 +84,8 @@ export async function scorePrompt(
     waterMl: data.waterMl ?? 10,
     co2Grams: data.co2Grams ?? 0.1,
     idealPrompt: data.idealPrompt,
+    justification: data.justification,
+    feedback: data.feedback,
   };
 }
 
@@ -92,6 +113,8 @@ export async function simulateScore(
       waterMl: res.waterMl ?? 10,
       co2Grams: res.co2Grams ?? 0.1,
       idealPrompt: res.idealPrompt,
+      justification: res.justification,
+      feedback: res.feedback,
     };
   }
   return mockScore(userPrompt);

@@ -54,7 +54,7 @@ export const LEARN_CONTENT = {
         },
         {
           myth: 'Prompt engineering is only about words, not parameters',
-          reality: 'Model parameters like Temperature dictate randomness. Lower values (0.2–0.5) enforce deterministic, factual answers; higher values (0.7–1.0) encourage creative, varied outputs.',
+          reality: 'Think of AI like a dial between "strict and literal" and "creative and unpredictable." Your words tell the AI *what* to do, but behind the scenes there\'s a creativity setting. Turn it low and the AI gives safe, consistent answers. Turn it high and it gets inventive — but might wander. Good prompting means knowing which mode you\'re writing for.',
           verdict: 'FALSE'
         },
         {
@@ -159,7 +159,7 @@ export const LEARN_CONTENT = {
       items: [
         {
           question: 'How is my score calculated?',
-          answer: 'Three dimensions: Accuracy (did your output match the content of the target?), Format (did the structure and shape match?), and Brevity (was your prompt concise?). Each is scored 0–100 and summed to 300 max. Brevity rewards you for achieving the same output with fewer words.'
+          answer: 'Three dimensions: Accuracy (Semantic Similarity 0–40 pts and Keyword Match 0–10 pts = 0–50 pts max), Format (Structural Match = 0–20 pts max), and Brevity (Green Efficiency: Token Economy 0–15 pts and Speed/Latency 0–15 pts = 0–30 pts max). Summing to 100 max.'
         },
         {
           question: 'Why does brevity matter if the output is accurate?',
@@ -196,6 +196,10 @@ export const LEARN_CONTENT = {
         {
           question: 'Does this help with Generative AI prompt writing or Agentic AI?',
           answer: 'PromptShot is designed specifically for Generative AI prompt writing (prompt engineering). It teaches you how to write clear, high-quality instructions to get the exact output you want on the first attempt (one-shot). It is not for Agentic AI (which involves building autonomous agent loops), though mastering precise prompt writing is also a core skill needed to instruct agents effectively.'
+        },
+        {
+          question: 'Why not just use an AI to write my prompts for me?',
+          answer: 'Using an AI to write prompts for basic, everyday tasks is a humorous exercise in over-engineering. If we require machine intelligence to draft the instructions for another machine just to produce a simple list or paragraph, we have added redundant middleware to our own thoughts. Setting environmental footprints aside, direct human-authored instructions preserve authentic intent, voice, and stylistic nuances. The human touch remains essential; delegating basic prompt crafting is simply outsourcing what our own minds can write in seconds.'
         }
       ]
     }
