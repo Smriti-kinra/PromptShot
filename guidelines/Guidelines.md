@@ -7,10 +7,9 @@ not a productivity app, not a website. Dark mode only. Every interaction should 
 satisfying and intentional.
 
 - **Density**: Breathable but game-focused — generous padding, no clutter
-- **Color philosophy**: Near-black canvas. Amber owns all scoring/game elements.
+- **Color philosophy**: Near-black forest-green canvas. Amber owns all scoring/game elements.
   Teal owns all environmental/impact elements. These two color worlds must never mix.
-- **Surface strategy**: #141414 cards float on #0A0A0A background. No borders between
-  layout regions — surface contrast creates hierarchy.
+- **Surface strategy**: Glassmorphic cards float on a deep forest-green (#0B1610) background, utilizing subtle borders and surface contrast to create visual hierarchy.
 - **Animation**: Present and purposeful. The bullseye fill animation IS the product moment.
 - **Copy**: Minimal. The UI never explains itself with paragraphs.
 
@@ -54,7 +53,7 @@ IMPORTANT: Do NOT use any color outside the 4-color system defined in colors.md.
 IMPORTANT: Do NOT add screens, routing, modals, or navigation not specified here.
 IMPORTANT: Amber (#F59E0B) is for game/scoring elements ONLY. Never use amber for
 environmental content.
-IMPORTANT: Teal (#14B8A6) is for environmental/impact elements ONLY. Never use teal
+IMPORTANT: Teal (#0EA79A) is for environmental/impact elements ONLY. Never use teal
 for scoring content.
 IMPORTANT: All spacing must be multiples of 8px. Never hardcode odd pixel values.
 IMPORTANT: The app is mobile-first. Design at 390px width. Desktop just centers the

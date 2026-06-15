@@ -16,25 +16,30 @@ $$\text{Final Brevity} = \text{Math.round}(\text{Raw Brevity} \times \text{Accur
 
 ---
 
-## 2. Token Economy (0–15 points)
+## 2. Token Economy & Brevity (0–30 points)
 
 Rewards players for drafting concise prompts compared to a benchmark "ideal prompt" length.
 
-* **Baseline Ideal Tokens**: Calculated as `Math.max(15, Math.round(ideal_prompt.length / 4))`
-* **Formula**:
-  $$\text{Token Penalty} = \text{Math.round}\left(\frac{\max(0, \text{user\_tokens} - \text{ideal\_tokens})}{3}\right)$$
-  $$\text{Token Score} = \max(0, 15 - \text{Token Penalty})$$
+* **Ideal Tokens Baseline**: Calculated as:
+  $$\text{Ideal Tokens} = \max(15, \text{Math.round}(\text{ideal\_prompt.length} / 4))$$
+* **Difficulty Ceiling Clamping**: The ideal baseline is clamped by a difficulty ceiling to prevent AI-generated challenges with highly variable ideal prompt lengths from distorting the score:
+  - **BEGINNER**: Ceiling of 40 tokens (~160 chars)
+  - **PRO**: Ceiling of 55 tokens (~220 chars)
+  - **EXPERT**: Ceiling of 70 tokens (~280 chars)
+  $$\text{Ideal Tokens Clamped} = \min(\text{Ceiling}, \text{Ideal Tokens})$$
+* **User Tokens**:
+  $$\text{User Tokens} = \max(1, \text{Math.round}(\text{user\_prompt.length} / 4))$$
+* **Token Efficiency Formula (0–15 scale)**:
+  $$\text{Token Penalty} = \text{Math.round}\left(\frac{\max(0, \text{User Tokens} - \text{Ideal Tokens Clamped})}{3}\right)$$
+  $$\text{Token Efficiency} = \max(0, 15 - \text{Token Penalty})$$
+* **Raw Brevity Score (0-30 scale)**:
+  $$\text{Raw Brevity} = \min(30, \text{Token Efficiency} \times 2)$$
 
 ---
 
-## 3. Speed / Latency (0–15 points)
+## 3. Speed / Latency (Removed from scoring)
 
-Rewards fast executions and penalizes conversational looping or heavy generations.
-
-* **Formula**:
-  $$\text{Latency (sec)} = \frac{\text{sandbox\_latency\_ms}}{1000}$$
-  $$\text{Latency Penalty} = \text{Math.round}(\max(0, \text{Latency} - 1.5) \times 2)$$
-  $$\text{Speed Score} = \max(0, 15 - \text{Latency Penalty})$$
+Latency/response speed is no longer factored into the player's brevity score to avoid penalizing players for transient server/network delays. However, response speed is still tracked in milliseconds for the ecological footprint estimates.
 
 ---
 

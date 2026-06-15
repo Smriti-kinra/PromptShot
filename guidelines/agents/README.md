@@ -39,7 +39,7 @@ For database and edge function changes:
 ## 3. Working Rules
 Every developer and agent modifying this repository must strictly adhere to the following rules:
 
-1. **Strict Theme Isolation**: Never mix colors outside the system. Amber (`#F59E0B`) is reserved for scoring. Mint/Teal (`#6EE09B`/`#14B8A6`) is reserved for environmental impact.
+1. **Strict Theme Isolation**: Never mix colors outside the system. Amber (`#F59E0B`) is reserved for scoring. Mint/Teal (`#6EE09B`/`#0EA79A`) is reserved for environmental impact.
 2. **Typography Constraints**: Headers/wordmarks must use **Space Grotesk**. Input and code elements must use **JetBrains Mono**.
 3. **State Machine Integrity**: App must use a single `gameState` enum for transitions: `challenge` $\to$ `loading` $\to$ `results` $\to$ `impact` $\to$ `already-played`. No routers or overlays.
 4. **Mobile-First Layout**: Viewports optimized at `390px` width (max-width `480px` centered on larger screens).

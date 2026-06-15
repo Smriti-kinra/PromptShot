@@ -22,10 +22,10 @@ graph TD
     
     Server -->|3. Evaluate| Step2[Step 2: LLM Judge Grading]
     SandboxOutput --> Step2
-    Step2 -->|Claude 3.5 Haiku Temp 0.0| JudgeJSON[Raw JSON: Semantic, Structural, Keyword]
+    Step2 -->|Claude 3.5 Haiku| JudgeJSON[Raw JSON: Semantic, Structural, Specificity]
     
     Server -->|4. Calculate| Math[Step 3: Efficiency Math]
-    Math -->|Token & Latency Penalty Formulas| FinalScores[Final Scores: Accuracy/50, Format/20, Brevity/30]
+    Math -->|Token Penalty Formula & Difficulty Multiplier| FinalScores[Final Scores: Accuracy/50, Format/20, Brevity/30, Total/100]
     
     FinalScores -->|5. Store| DB[(Supabase Database)]
     FinalScores -->|6. Render| UI[Frontend UI / Results Screen]
@@ -50,14 +50,16 @@ To protect system resources and prevent wasting LLM tokens on garbage inputs, th
 
 ## 3. Score Mapping & Storage
 
-To align the 100-point rubric with the existing database schema without performing database migrations, scores are mapped into the `scores` table as follows:
+To align the 100-point rubric with the database schema, scores are mapped into the `scores` table as follows:
 
 | Database Column | Scored Component | Score Range | Description |
 | :--- | :--- | :--- | :--- |
-| `accuracy` | Semantic + Keyword | 0–50 pts | Content accuracy and key terminology |
+| `accuracy` | Semantic + Specificity | 0–50 pts | Content accuracy and unique specific identifiers |
 | `format` | Structural Match | 0–20 pts | Layout matching (lists, tables, code) |
-| `brevity` | Green Efficiency | 0–30 pts | Token economy (15) and speed/latency (15) |
-| **`total`** | **Total Score** | **0–100 pts** | **Sum of all dimensions** |
+| `brevity` | Green Efficiency | 0–30 pts | Token economy compared to ideal baseline |
+| **`total`** | **Total Score** | **0–100 pts** | **Sum of above, scaled by difficulty multiplier** |
+
+* **Difficulty Adjustment**: The final sum is multiplied by `1.0` (Beginner), `1.15` (Pro), or `1.30` (Expert), capped at `100`.
 
 ---
 

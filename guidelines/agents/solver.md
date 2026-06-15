@@ -20,30 +20,35 @@ SUPABASE_FUNCTIONS_URL = "https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/
 # Custom Tools for the Solver Agent
 # ---------------------------------------------------------
 
-async def get_challenge_target_output(difficulty: str) -> str:
-    """Fetches the target output for today's active PromptShot challenge.
+async def get_challenge_details(difficulty: str) -> dict:
+    """Fetches today's active PromptShot challenge details.
 
     Args:
         difficulty: The level of the challenge, e.g., 'BEGINNER', 'PRO', or 'EXPERT'.
     """
-    return (
-        "Hi Dave, thanks for the invite. Since my calendar is fully booked this week, "
-        "could you send over the key questions or agenda via Slack/email? I'll review "
-        "them and reply asynchronously by end of day today so we can save time."
-    )
+    # In a real environment, this makes an API request to /challenge?difficulty={difficulty}
+    return {
+        "id": "ai_daily_1",
+        "target_output": (
+            "Hi Dave, thanks for the invite. Since my calendar is fully booked this week, "
+            "could you send over the key questions or agenda via Slack/email? I'll review "
+            "them and reply asynchronously by end of day today so we can save time."
+        )
+    }
 
-async def submit_prompt_attempt(user_prompt: str, target_output: str, ctx: ToolContext) -> str:
+async def submit_prompt_attempt(challenge_id: str, user_prompt: str, difficulty: str, ctx: ToolContext) -> str:
     """Submits a candidate prompt to the scoring agent and returns the score breakdown.
 
     Args:
+        challenge_id: The ID of the challenge being played.
         user_prompt: The prompt you want to test.
-        target_output: The expected output that needs to be generated.
+        difficulty: The difficulty level (e.g. 'BEGINNER').
     """
     url = f"{SUPABASE_FUNCTIONS_URL}/score-guest"
     payload = {
+        "challengeId": challenge_id,
         "userPrompt": user_prompt,
-        "targetOutput": target_output,
-        "idealPrompt": "Write polite sync denial reply to Dave asking for email agenda because calendar is booked, async reply by end of day."
+        "difficulty": difficulty
     }
 
     try:
@@ -76,16 +81,16 @@ async def main():
     # Setup configuration with Gemini and register tools
     config = LocalAgentConfig(
         model="gemini-3.5-flash",
-        tools=[get_challenge_target_output, submit_prompt_attempt],
+        tools=[get_challenge_details, submit_prompt_attempt],
         system_instructions=(
             "You are an expert Prompt Engineer and an autonomous PromptShot solver agent. "
             "Your objective is to find a prompt that generates the target output with the highest "
             "possible score (aim for at least 90/100 total). "
             "\n\n"
             "Follow this execution flow:\n"
-            "1. Retrieve the target output using `get_challenge_target_output`.\n"
+            "1. Retrieve the challenge details using `get_challenge_details` with difficulty 'BEGINNER'.\n"
             "2. Formulate an initial candidate prompt. Focus on describing details, layout, and constraints precisely.\n"
-            "3. Submit the candidate prompt using `submit_prompt_attempt`.\n"
+            "3. Submit the candidate prompt using `submit_prompt_attempt` with the retrieved challenge id, difficulty 'BEGINNER', and your candidate prompt.\n"
             "4. Analyze the returned score breakdown. If Accuracy or Format are low, add details to guide content/structure.\n"
             "   If Brevity is low, refactor the prompt to be more concise while preserving essential directives.\n"
             "5. Iterate until you achieve a score >= 90 or complete 5 attempts."
@@ -95,7 +100,7 @@ async def main():
     print("Initializing PromptShot Solver Agent...")
     async with Agent(config=config) as agent:
         response = await agent.chat(
-            "Solve today's BEGINNER PromptShot challenge. Begin by fetching the challenge target output."
+            "Solve today's BEGINNER PromptShot challenge. Begin by fetching the challenge details."
         )
         async for chunk in response:
             print(chunk, end="", flush=True)

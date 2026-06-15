@@ -1,55 +1,34 @@
 # Color System
 
-PromptShot uses exactly 4 colors. Do not add any others.
+PromptShot uses a curated forest-green theme with strict styling boundaries.
 
-| Role | Hex | Tailwind custom name | Used for |
+| Role | Hex | Token Name | Used for |
 |---|---|---|---|
-| Background | #0A0A0A | bg-game-bg | Page canvas only |
-| Surface | #141414 | bg-game-surface | Cards, inputs, panels |
-| Text primary | #F0EFE8 | text-game-primary | All primary text |
-| Text secondary | #888880 | text-game-secondary | Labels, captions, hints |
-| Amber | #F59E0B | text-amber / bg-amber | ALL scoring/game elements |
-| Teal | #14B8A6 | text-teal / bg-teal | ALL environmental elements |
+| Background | #0B1610 | --ps-background | Page body / base canvas |
+| Surface | #121C14 | --ps-surface | Glassmorphic card base background |
+| Surface 2 | #1A2E1C | --ps-surface-2 | Secondary panel background / elements |
+| Text primary | #D4E8D4 | --ps-text-primary | High-contrast body, headings, and values |
+| Text secondary | #9CD19C | --ps-text-secondary | Labels, subtitles, and captions |
+| Text muted | #2E4F31 | --ps-text-muted | Very low-contrast text / placeholders |
+| Mint | #6EE09B | --ps-mint | Bright highlight elements |
+| Teal | #0EA79A | --ps-teal | Environmental / eco-impact elements ONLY |
+| Amber | #F59E0B | --ps-amber | Game / scoring elements ONLY |
+| Border | #243B27 | --ps-border | Primary borders |
+| Border subtle | #1A2E1C | --ps-border-subtle | Low-contrast delimiters |
 
-Add these to tailwind.config.js extend.colors:
-```js
-colors: {
-  'game-bg': '#0A0A0A',
-  'game-surface': '#141414',
-  'game-primary': '#F0EFE8',
-  'game-secondary': '#888880',
-  amber: { DEFAULT: '#F59E0B', dim: 'rgba(245,158,11,0.15)' },
-  teal: { DEFAULT: '#14B8A6', dim: 'rgba(20,184,166,0.12)' }
-}
-```
+## Two-World Color Rule
+* **Amber (#F59E0B)**: Exclusively for game, score, bullseye, streak, difficulty badge, and prompt submission actions.
+* **Teal (#0EA79A)**: Exclusively for environmental metrics, carbon & water estimations, and the eco impact card.
+* **Mint (#6EE09B)**: Used as a neutral bright accent or success/action highlight.
+* **Never mix amber and teal inside components.**
 
-## Decision tree
-┌─ "What color should I use for this element?"
-│
-├─ GAME element (score, bullseye ring, streak, submit button, difficulty badge)?
-│  └─ Amber (#F59E0B)
-│
-├─ ENVIRONMENTAL element (water, CO₂, impact card, eco stats)?
-│  └─ Teal (#14B8A6)
-│
-├─ PRIMARY text (headings, body, values)?
-│  └─ #F0EFE8 (game-primary)
-│
-├─ SECONDARY text (labels, captions, hints, counters)?
-│  └─ #888880 (game-secondary)
-│
-├─ CARD or panel background?
-│  └─ #141414 (game-surface)
-│
-└─ PAGE background (body, main canvas)?
-└─ #0A0A0A (game-bg)
+## Glassmorphism System
+Cards in PromptShot use semi-transparent background blends with backdrop filters:
+* **Default Card (`.ps-glass-panel`)**: Background: `rgba(18, 28, 20, 0.45)` with `backdrop-filter: blur(16px)` and border `1px solid rgba(110, 224, 155, 0.08)`.
+* **Amber Card (`.ps-glass-panel-amber`)**: Background: `rgba(26, 22, 10, 0.45)` with `backdrop-filter: blur(16px)` and border `1px solid rgba(245, 158, 11, 0.1)`.
 
 ## Rules
-- NEVER use amber for anything environmental
-- NEVER use teal for anything game/scoring related  
-- NEVER use white (#ffffff) — use #F0EFE8 for bright text
-- NEVER use gray shades not in this system
-- Amber at 15% opacity (amber-dim) is valid for badge backgrounds
-- Teal at 12% opacity (teal-dim) is valid for impact card backgrounds
-- Borders: always 1px solid rgba(255,255,255,0.08). Nothing brighter.
-- Focus ring on inputs: 0 0 0 2px rgba(245,158,11,0.4) — amber at 40%
+- NEVER use amber for anything environmental.
+- NEVER use teal for anything game/scoring related.
+- ALWAYS use the variables defined in `src/styles/theme.css` to keep themes consistent.
+- Focus rings on active inputs use the --ring token: `oklch(0.82 0.13 155)` with 50% opacity.
