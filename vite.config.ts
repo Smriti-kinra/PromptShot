@@ -39,4 +39,4 @@ export default defineConfig(({ command }) => ({
     host: true,
     allowedHosts: 'all',
   },
-})
+}))
