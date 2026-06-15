@@ -34,4 +34,9 @@ export default defineConfig({
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
+  // Allow Figma Make's preview panel to connect to the dev server
+  server: {
+    host: true,
+    allowedHosts: 'all',
+  },
 })
