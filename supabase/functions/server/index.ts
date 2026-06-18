@@ -4,6 +4,11 @@ import { logger } from "npm:hono/logger";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
 
+// ─── tiny utility ────────────────────────────────────────────────────────────
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
 const app = new Hono();
 app.use('*', logger(console.log));
 app.use("/*", cors({
@@ -16,6 +21,41 @@ app.use("/*", cors({
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
+
+// Initialize Gemini configuration
+const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
+const GEMINI_SANDBOX_MODEL = Deno.env.get("GEMINI_SANDBOX_MODEL") || "gemini-2.5-flash";
+const GEMINI_JUDGE_MODEL = Deno.env.get("GEMINI_JUDGE_MODEL") || "gemini-2.5-flash";
+const GEMINI_GEN_MODEL = Deno.env.get("GEMINI_GEN_MODEL") || "gemini-2.5-flash";
+
+async function fetchGeminiWithFallback(model: string, body: any): Promise<Response> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+  let response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (response.status === 429 && model !== GEMINI_SANDBOX_MODEL) {
+    console.warn(`[Gemini] Model ${model} returned 429. Falling back to sandbox model (${GEMINI_SANDBOX_MODEL})...`);
+    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_SANDBOX_MODEL}:generateContent?key=${GEMINI_KEY}`;
+    response = await fetch(fallbackUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  return response;
+}
+
+function hasPlaceholders(text: string): boolean {
+  const placeholderRegex = /\[(?:Your\s+)?(?:Name|Company|Client|Customer|Date|Time|Amount|Invoice|Details|Contact|Sender|Receiver|Title|Url|Email|Phone|Product|Address)\]/i;
+  const genericBracketRegex = /\[\s*[a-zA-Z\s]{2,20}\s*\]/g;
+  const parenthesisPlaceholder = /\((?:insert\s+|your\s+)?(?:name|company|client|date|time|amount|invoice|details|contact|sender|receiver|title|url|email|phone|product)\)/i;
+  const angleBracketPlaceholder = /<(?:your\s+)?(?:name|company|client|date|time|amount|invoice|details|contact|sender|receiver|title|url|email|phone|product)>/i;
+  return placeholderRegex.test(text) || genericBracketRegex.test(text) || parenthesisPlaceholder.test(text) || angleBracketPlaceholder.test(text);
+}
 
 app.get("/make-server-488928a2/health", (c) => c.json({ status: "ok" }));
 
@@ -76,9 +116,7 @@ async function verifyUser(authHeader?: string): Promise<void> {
 }
 
 async function runSandbox(userPrompt: string) {
-  const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
-  const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL_NAME") || "claude-3-5-haiku-20241022";
+  if (!GEMINI_KEY) throw new Error("GEMINI_API_KEY not set");
 
   const systemPrompt = `You are the isolated execution sandbox for the game PromptShot. 
 
@@ -91,48 +129,46 @@ CRITICAL SAFETY DIRECTIVES:
 4. Match the length and format the player's prompt actually asks for. Do not pad with extra caveats, disclaimers, or "let me know if you'd like changes" closers — a real one-shot output wouldn't include those.`;
 
   const startTime = performance.now();
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_KEY,
-      "anthropic-version": "2023-06-01",
+  const response = await fetchGeminiWithFallback(GEMINI_SANDBOX_MODEL, {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: `<player_prompt>\n${userPrompt}\n</player_prompt>` }]
+      }
+    ],
+    systemInstruction: {
+      parts: [{ text: systemPrompt }]
     },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: 1000,
+    generationConfig: {
       temperature: 0.1,
-      system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `<player_prompt>
-${userPrompt}
-</player_prompt>`
-        }
-      ]
-    })
+      maxOutputTokens: 1000,
+    }
   });
 
   const latencyMs = performance.now() - startTime;
 
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Anthropic Sandbox API error ${response.status}: ${err}`);
+    const errText = await response.text();
+    let parsedErr;
+    try {
+      parsedErr = JSON.parse(errText);
+    } catch (_) {
+      // ignore JSON parse error for raw text fallback
+    }
+    const msg = parsedErr?.error?.message || errText;
+    throw new Error(`Gemini Sandbox API error ${response.status}: ${msg}`);
   }
 
   const data = await response.json();
-  const outputText = data.content?.[0]?.text || "";
-  const promptTokens = data.usage?.input_tokens ?? 0;
-  const completionTokens = data.usage?.output_tokens ?? 0;
+  const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const promptTokens = data.usageMetadata?.promptTokenCount ?? 0;
+  const completionTokens = data.usageMetadata?.candidatesTokenCount ?? 0;
 
   return { outputText, promptTokens, completionTokens, latencyMs };
 }
 
 async function runJudge(playerOutput: string, targetOutput: string) {
-  const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
-  const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL_NAME") || "claude-3-5-haiku-20241022";
+  if (!GEMINI_KEY) throw new Error("GEMINI_API_KEY not set");
 
   const systemPrompt = `You are the strict automated grading engine for the game PromptShot.
 
@@ -172,59 +208,58 @@ CRITICAL EXECUTION RULES:
 - If the player's generated text is completely unrelated to the target text, is absurd, refuses the task, is empty/near-empty, or has zero contextual overlap, you MUST award exactly 0 points across all three criteria (Semantic Similarity = 0, Structural Match = 0, Specificity Match = 0).
 - Be completely objective and strict. When a deduction is plausible, take it. Small formatting, factual, or phrasing deviations should lose points — do not round up.
 - If you are torn between two adjacent score bands for a criterion, choose the lower band.
-- "justification" must name SPECIFIC differences (e.g., "target uses a numbered list with 5 items, player output is a single paragraph" or "target specifies the deadline as Friday; player output omits any deadline") — generic praise or generic criticism is not acceptable.
-- Return your evaluation ONLY as a valid, raw JSON object. Do not wrap it in markdown code blocks (no ```json). Do not add conversational text.
+- "justification" must name SPECIFIC differences (e.g., "target uses a numbered list with 5 items, player output is a single paragraph" or "target specifies the deadline as Friday; player output omits any deadline") — generic praise or generic criticism is not acceptable.`;
 
-Expected JSON Schema Output:
-{
-  "semantic_score": <integer, 0-40>,
-  "structural_score": <integer, 0-20>,
-  "specificity_score": <integer, 0-10>,
-  "accuracy_subtotal": <integer, 0-70, sum of the three scores above>,
-  "justification": "<string, a direct 1-2 sentence technical explanation citing SPECIFIC mismatches or matches that justify the scores>",
-  "player_feedback": "<string, a friendly, encouraging 1-sentence tip on how they could tweak their prompting strategy next time to hit the target more precisely>"
-}`;
+  const userContent = `Target Output:\n${targetOutput}\n\nPlayer Generated Output:\n${playerOutput}`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_KEY,
-      "anthropic-version": "2023-06-01",
+  const response = await fetchGeminiWithFallback(GEMINI_JUDGE_MODEL, {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: userContent }]
+      }
+    ],
+    systemInstruction: {
+      parts: [{ text: systemPrompt }]
     },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: 400,
+    generationConfig: {
       temperature: 0.0,
-      system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Target Output:
-${targetOutput}
-
-Player Generated Output:
-${playerOutput}`
-        }
-      ]
-    })
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          semantic_score: { type: "INTEGER", description: "0 to 40 score for Semantic Similarity" },
+          structural_score: { type: "INTEGER", description: "0 to 20 score for Structural Match" },
+          specificity_score: { type: "INTEGER", description: "0 to 10 score for Specificity Match" },
+          accuracy_subtotal: { type: "INTEGER", description: "Sum of semantic_score, structural_score, and specificity_score" },
+          justification: { type: "STRING", description: "Detailed 1-2 sentence explanation of differences/similarities" },
+          player_feedback: { type: "STRING", description: "Helpful tip for the player on prompting strategy" }
+        },
+        required: ["semantic_score", "structural_score", "specificity_score", "accuracy_subtotal", "justification", "player_feedback"]
+      }
+    }
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Anthropic Judge API error ${response.status}: ${err}`);
+    const errText = await response.text();
+    let parsedErr;
+    try {
+      parsedErr = JSON.parse(errText);
+    } catch (_) {
+      // ignore JSON parse error for raw text fallback
+    }
+    const msg = parsedErr?.error?.message || errText;
+    throw new Error(`Gemini Judge API error ${response.status}: ${msg}`);
   }
 
   const data = await response.json();
-  const text = data.content?.[0]?.text || "{}";
-  
-  const cleanedText = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
   try {
-    return JSON.parse(cleanedText);
+    return JSON.parse(text.trim());
   } catch (err) {
-    console.error("Failed to parse Judge JSON response:", cleanedText, err);
-    throw new Error("Invalid Judge response format");
+    console.error("Failed to parse Gemini Judge JSON response:", text, err);
+    throw new Error("Invalid Gemini Judge response format");
   }
 }
 
@@ -512,43 +547,359 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SCENARIO_POOL: string[] = [
+  "Drafting a kind, clear excuse text to your parents explaining why you can't visit this weekend",
+  "A witty, lighthearted dating app opener based on a profile detail (like hiking, cooking, or books)",
+  "A friendly but firm text to a friend requesting they pay you back for concert tickets or dinner",
+  "An apology text to a friend after flaking on plans at the last minute",
+  "A recipe swap message introducing a quick weekday dinner substitute with a specific tone",
+  "A complaint email to a company about a late food delivery or missing item, demanding a refund",
+  "A toast for a friend's wedding, balancing humor and heart, in a single short paragraph",
+  "A roommate group chat message about cleaning the kitchen or taking out the trash",
+  "A casual birthday party invite message with a chaotic-fun, high-energy tone",
+  "A breakup or 'let's just be friends' text that's kind but direct and under 40 words",
+  "Drafting an out-of-office autoreply that sounds warm and personal, not robotic",
+  "A polite request to a neighbor to turn down loud music late at night without sounding aggressive",
+  "A travel itinerary snippet for a weekend day, detailing exact morning/afternoon timing",
+  "A hype text to a gym buddy motivating them to not skip today's leg day workout",
+  "A product review response from a local café owner, handling a bad review gracefully",
+  "A 'translate my angry thoughts into a polite message' to a landlord about delayed maintenance",
+  "A short social caption for an Instagram photo of a failed baking attempt, sounding self-deprecating and funny",
+  "A text to a sibling asking to borrow their car for the weekend, offering a specific trade-off",
   "Replying to a coworker's meeting invite to politely decline and reschedule async",
   "Explaining a force-push / git mishap to the team in a Slack-style update",
   "Translating a corporate buzzword-heavy announcement into blunt plain English",
-  "A hype motivational pep talk (gym-bro, drill sergeant, or coach persona) about finishing a task",
-  "A numbered survival checklist for a mundane annoying situation (long meetings, group chats, commutes)",
-  "A firm but professional notice to a landlord, neighbor, or service provider about an unresolved issue",
+  "A firm but professional notice to a vendor about a missed project milestone",
   "A polite-but-firm payment/invoice follow-up email to a client",
-  "A roommate group chat message about splitting bills or chores",
-  "An apology text to a friend after flaking on plans",
-  "A short, punchy social caption or bio rewrite for a specific platform and vibe",
   "A code review comment pointing out a bug and suggesting the fix, in a specific tone",
-  "A commit message or PR description summarizing a fix, written in a specific style",
-  "Rewriting a clunky resume bullet point to be results-driven and concise",
-  "A customer support response to a frustrated customer, with a specific tone and structure",
-  "A short status update / standup report covering yesterday, today, and blockers",
-  "A passive-aggressive office notice (about the fridge, dishes, parking, etc.) rewritten to sound professional",
-  "A travel itinerary snippet for a single day, with specific timing and structure",
-  "A workout or meal plan tweak explained in a specific format (table, list, or short paragraph)",
-  "A breakup or 'let's just be friends' text that's kind but clear, with a length constraint",
-  "A birthday/event invite message with a specific tone (casual, formal, chaotic-fun)",
-  "Refactoring a small code snippet to follow a specific style guide or constraint (naming, error handling, etc.)",
-  "A negotiation message asking for a raise, deadline extension, or better terms, with a specific tone",
-  "A product review response from a small business owner, balancing gratitude and a fix",
-  "A 'translate my rant into something I can actually send' message for a tense personal situation",
 ];
 
-function pickScenario(): string {
-  return SCENARIO_POOL[Math.floor(Math.random() * SCENARIO_POOL.length)];
+async function pickFreshScenario(difficulty: string): Promise<string> {
+  const kvKey = `recent_scenarios_${difficulty.toLowerCase()}`;
+  let recent: string[] = [];
+  try {
+    recent = await kv.get(kvKey) || [];
+  } catch (err) {
+    console.warn("Failed to read recent scenarios from KV:", err);
+  }
+
+  // Filter out recently used scenarios to prevent staleness
+  const available = SCENARIO_POOL.filter(s => !recent.includes(s));
+  const poolToUse = available.length > 0 ? available : SCENARIO_POOL;
+  const picked = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+
+  // Update history keeping at most 14 recent entries
+  const updated = [picked, ...recent].slice(0, 14);
+  try {
+    await kv.set(kvKey, updated);
+  } catch (err) {
+    console.warn("Failed to write recent scenarios to KV:", err);
+  }
+
+  return picked;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// idealPrompt round-trip validation
+//
+// After generateAIChallenge produces a candidate we immediately feed its own
+// idealPrompt through the same runSandbox → runJudge pipeline that real player
+// attempts go through.  If the score is below IDEAL_SCORE_THRESHOLD the
+// challenge is discarded and regenerated (up to MAX_RETRIES times).  On
+// exhaustion we fall back to a pre-vetted static challenge for that difficulty.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MAX_RETRIES = 3;
+const IDEAL_SCORE_THRESHOLD = 85;
+
+// Per-difficulty score floor — EXPERT challenges have more inherent variance
+// so we accept a slightly lower bar rather than burning retries constantly.
+const THRESHOLD_BY_DIFFICULTY: Record<string, number> = {
+  BEGINNER: 80,
+  PRO:      80,
+  EXPERT:   78,
+};
+
+/**
+ * Runs `candidate.idealPrompt` through the live sandbox → judge pipeline and
+ * returns a 0-100 score using the same weighting as callClaudeScorer.
+ *
+ * Brevity is awarded in full (30 pts) because the idealPrompt is by design
+ * a compact, single-shot prompt — the real discriminators are semantic match
+ * and structural match which together cap at 70 pts.
+ */
+async function validateIdealPrompt(candidate: {
+  idealPrompt: string;
+  targetOutput: string;
+  target_output?: string;
+}): Promise<number> {
+  const targetOutput = candidate.targetOutput ?? candidate.target_output ?? "";
+
+  // Step 1: run the idealPrompt through the same execution sandbox
+  const sandbox = await runSandbox(candidate.idealPrompt);
+
+  // Step 2: judge the sandbox output against the targetOutput
+  const judgeResult = await runJudge(sandbox.outputText, targetOutput);
+
+  // Step 3: score identically to callClaudeScorer (accuracy + format)
+  // Brevity: idealPrompt is always compact → full 30 pts
+  const semantic  = clamp(judgeResult.semantic_score  ?? 0, 0, 40);
+  const keyword   = clamp(judgeResult.specificity_score ?? judgeResult.keyword_score ?? 0, 0, 10);
+  const structure = clamp(judgeResult.structural_score ?? 0, 0, 20);
+  const brevityBonus = 30; // full credit — it's meant to be a short prompt
+
+  const total = Math.min(100, semantic + keyword + structure + brevityBonus);
+  return total;
+}
+
+// ─── static fallback pool ──────────────────────────────────────────────────
+// One well-tested challenge per difficulty level.  These are served verbatim
+// when all AI generation + validation attempts are exhausted.
+// Rotating by day-of-year within each tier avoids showing the same challenge
+// two days in a row when a fallback fires.
+const STATIC_FALLBACKS: Record<string, object[]> = {
+  BEGINNER: [
+    {
+      id: "static_beginner_001",
+      category: "TONE",
+      difficulty: "BEGINNER",
+      skill: "Polite meeting denial",
+      impactLesson: "Perfecting tone on the first try saves the energy of drafting multiple apologetic correction emails.",
+      targetOutput: "Hi Dave, thanks for the invite. Since my calendar is fully booked this week, could you send over the key questions or agenda via Slack/email? I'll review them and reply asynchronously by end of day today so we can save time.",
+      target_output: "Hi Dave, thanks for the invite. Since my calendar is fully booked this week, could you send over the key questions or agenda via Slack/email? I'll review them and reply asynchronously by end of day today so we can save time.",
+      idealPrompt: "Write a polite but direct response to a coworker named Dave, declining a sync invite because your calendar is booked. Ask him to send the agenda/questions via Slack/email instead, and promise an async reply by end of day. Keep it under 45 words.",
+      ideal_prompt: "Write a polite but direct response to a coworker named Dave, declining a sync invite because your calendar is booked. Ask him to send the agenda/questions via Slack/email instead, and promise an async reply by end of day. Keep it under 45 words.",
+      charCount: 218,
+      char_count: 218,
+      active: true,
+      validationScore: 100, // handcrafted, pre-vetted
+    },
+    {
+      id: "static_beginner_002",
+      category: "LIST",
+      difficulty: "BEGINNER",
+      skill: "Zoom survival checklist",
+      impactLesson: "Setting structural expectations prevents multiple retries to fix bullet style and layout.",
+      targetOutput: "Survival Checklist:\n1. Mute button checked twice (safety first)\n2. Camera on 'thoughtful nod' loop\n3. Coffee mug filled to the brim\n4. Dual-monitor setup hides actual work\n5. Pre-drafted Slack update ready for the end",
+      target_output: "Survival Checklist:\n1. Mute button checked twice (safety first)\n2. Camera on 'thoughtful nod' loop\n3. Coffee mug filled to the brim\n4. Dual-monitor setup hides actual work\n5. Pre-drafted Slack update ready for the end",
+      idealPrompt: "Create a 5-item survival checklist for surviving a long, boring Zoom meeting. Use bullet numbers. Focus on mute checks, camera nods, coffee, hiding work, and pre-drafted status updates. Start with the title 'Survival Checklist:'.",
+      ideal_prompt: "Create a 5-item survival checklist for surviving a long, boring Zoom meeting. Use bullet numbers. Focus on mute checks, camera nods, coffee, hiding work, and pre-drafted status updates. Start with the title 'Survival Checklist:'.",
+      charCount: 216,
+      char_count: 216,
+      active: true,
+      validationScore: 100,
+    },
+  ],
+  PRO: [
+    {
+      id: "static_pro_001",
+      category: "CODE",
+      difficulty: "PRO",
+      skill: "Git disaster mitigation",
+      impactLesson: "Detailed technical status reports prevent endless clarification pings on Slack, saving database and server roundtrips.",
+      targetOutput: "Hey team, my local branch is out of sync after an interactive rebase mismatch. I am force-pushing the origin branch from yesterday to reset it. No other branches are affected, and I will have the clean PR ready in 30 minutes.",
+      target_output: "Hey team, my local branch is out of sync after an interactive rebase mismatch. I am force-pushing the origin branch from yesterday to reset it. No other branches are affected, and I will have the clean PR ready in 30 minutes.",
+      idealPrompt: "Write a brief Slack update to your dev team. Explain that your branch is out of sync due to a rebase mismatch, you are force-pushing yesterday's origin branch to reset it, and no other branches are affected. State the PR will be ready in 30 minutes. Keep it professional and direct.",
+      ideal_prompt: "Write a brief Slack update to your dev team. Explain that your branch is out of sync due to a rebase mismatch, you are force-pushing yesterday's origin branch to reset it, and no other branches are affected. State the PR will be ready in 30 minutes. Keep it professional and direct.",
+      charCount: 224,
+      char_count: 224,
+      active: true,
+      validationScore: 100,
+    },
+    {
+      id: "static_pro_002",
+      category: "TONE",
+      difficulty: "PRO",
+      skill: "Overdue payment follow-up",
+      impactLesson: "Polite yet demanding follow-ups avoid the need for manual escalation or repeated drafts.",
+      targetOutput: "Hi team, I am following up on invoice #1042 which is now 60 days overdue. Please reply with the payment confirmation status by Friday. A late fee of 5% will be applied starting next week per our contract terms.",
+      target_output: "Hi team, I am following up on invoice #1042 which is now 60 days overdue. Please reply with the payment confirmation status by Friday. A late fee of 5% will be applied starting next week per our contract terms.",
+      idealPrompt: "Write a professional follow-up email to a client for invoice #1042 that is 60 days overdue. Request a payment confirmation status by Friday. Mention a 5% late fee starting next week based on contract terms. Keep it direct and firm.",
+      ideal_prompt: "Write a professional follow-up email to a client for invoice #1042 that is 60 days overdue. Request a payment confirmation status by Friday. Mention a 5% late fee starting next week based on contract terms. Keep it direct and firm.",
+      charCount: 212,
+      char_count: 212,
+      active: true,
+      validationScore: 100,
+    },
+  ],
+  EXPERT: [
+    {
+      id: "static_expert_001",
+      category: "CONSTRAINTS",
+      difficulty: "EXPERT",
+      skill: "LinkedIn reality check",
+      impactLesson: "Exclusion boundaries help the model translate fluff directly without wandering off on secondary details.",
+      targetOutput: "Translation: I was laid off along with 15% of the staff. The corporate pivot failed, the culture was toxic, and my equity is worth zero. I am now unemployed and looking for a job that pays actual money.",
+      target_output: "Translation: I was laid off along with 15% of the staff. The corporate pivot failed, the culture was toxic, and my equity is worth zero. I am now unemployed and looking for a job that pays actual money.",
+      idealPrompt: "Translate a hype-filled corporate announcement into a raw, brutally honest summary: mention being laid off in a 15% cut, the failed corporate pivot, toxic culture, worthless equity, and looking for a new role. Prefix with 'Translation: '.",
+      ideal_prompt: "Translate a hype-filled corporate announcement into a raw, brutally honest summary: mention being laid off in a 15% cut, the failed corporate pivot, toxic culture, worthless equity, and looking for a new role. Prefix with 'Translation: '.",
+      charCount: 204,
+      char_count: 204,
+      active: true,
+      validationScore: 100,
+    },
+    {
+      id: "static_expert_002",
+      category: "TONE",
+      difficulty: "EXPERT",
+      skill: "Firm landlord notice",
+      impactLesson: "Writing a firm legal notice once avoids long back-and-forth negotiations, saving human and machine bandwidth.",
+      targetOutput: "Dear Landlord, this is a formal notice regarding active water damage in the living room ceiling. Per state tenancy guidelines, this requires urgent mitigation to prevent structural mold. Please confirm when the repair team will arrive today.",
+      target_output: "Dear Landlord, this is a formal notice regarding active water damage in the living room ceiling. Per state tenancy guidelines, this requires urgent mitigation to prevent structural mold. Please confirm when the repair team will arrive today.",
+      idealPrompt: "Write a formal email notice to your landlord about active ceiling water damage. Reference state tenancy guidelines, request urgent mitigation to prevent mold, and ask for repair confirmation today. Sound firm, legal, and professional.",
+      ideal_prompt: "Write a formal email notice to your landlord about active ceiling water damage. Reference state tenancy guidelines, request urgent mitigation to prevent mold, and ask for repair confirmation today. Sound firm, legal, and professional.",
+      charCount: 243,
+      char_count: 243,
+      active: true,
+      validationScore: 100,
+    },
+  ],
+};
+
+/**
+ * Returns a static fallback challenge for the given difficulty, rotating by
+ * day-of-year so the same challenge doesn't appear on consecutive fallback days.
+ */
+function getStaticFallbackChallenge(difficulty: string): object {
+  const key = difficulty.toUpperCase();
+  const pool = STATIC_FALLBACKS[key] ?? STATIC_FALLBACKS["BEGINNER"];
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
+  );
+  return pool[dayOfYear % pool.length];
+}
+
+/**
+ * Generates an AI challenge and immediately validates its idealPrompt by
+ * running it through the full sandbox → judge pipeline.  Retries up to
+ * MAX_RETRIES times before falling back to a handcrafted static challenge.
+ *
+ * The returned object always includes a `validationScore` field (0-100)
+ * for auditability in the KV store.
+ */
+async function generateValidatedChallenge(difficulty: string): Promise<object> {
+  const threshold = THRESHOLD_BY_DIFFICULTY[difficulty.toUpperCase()] ?? IDEAL_SCORE_THRESHOLD;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    console.log(`[Challenge] Attempt ${attempt}/${MAX_RETRIES} — generating ${difficulty} challenge...`);
+
+    let candidate;
+    try {
+      candidate = await generateAIChallenge(difficulty);
+    } catch (err) {
+      console.error(`[Challenge] generateAIChallenge threw on attempt ${attempt}:`, err);
+      continue; // generation itself failed → retry
+    }
+
+    let validationScore = 0;
+    try {
+      validationScore = await validateIdealPrompt(candidate);
+      console.log(
+        `[Challenge] Attempt ${attempt}: idealPrompt scored ${validationScore}/100 ` +
+        `(threshold: ${threshold})`
+      );
+    } catch (err) {
+      console.error(`[Challenge] validateIdealPrompt threw on attempt ${attempt}:`, err);
+      // treat thrown validation as failed → retry
+      continue;
+    }
+
+    if (validationScore >= threshold) {
+      console.log(`[Challenge] Attempt ${attempt} accepted ✓ (score: ${validationScore})`);
+      return { ...candidate, validationScore };
+    }
+
+    console.warn(
+      `[Challenge] Attempt ${attempt} rejected — ` +
+      `idealPrompt scored ${validationScore}/100 (need ${threshold}+). Discarding and retrying...`
+    );
+  }
+
+  // All retries exhausted — serve a handcrafted, pre-vetted static challenge
+  console.error(
+    `[Challenge] All ${MAX_RETRIES} generation+validation attempts failed for ${difficulty}. ` +
+    `Falling back to static handcrafted challenge.`
+  );
+  return getStaticFallbackChallenge(difficulty);
+}
+
+async function runCritic(candidates: any[], difficulty: string): Promise<number> {
+  if (!GEMINI_KEY) throw new Error("GEMINI_API_KEY not set");
+
+  const systemPrompt = `You are a prompt-engineering quality critic for the game PromptShot.
+Your job is to evaluate 3 candidate challenges for a daily puzzle and select the single BEST candidate based on the quality criteria.
+
+CRITICAL QUALITY CRITERIA:
+1. One clearly correct structural approach: The target output should have a clean, obvious format (e.g., a short email, a structured list, a code block) matching its category.
+2. Readable in 30 seconds: The target output must be concise, punchy, and under ~320 characters. It should not contain verbose disclaimers or repetitive sentences.
+3. idealPrompt length constraint: The ideal prompt must be under the character limit for the ${difficulty} difficulty level.
+   - BEGINNER: idealPrompt must be under 120 characters.
+   - PRO: idealPrompt must be under 150 characters.
+   - EXPERT: idealPrompt must be under 200 characters.
+4. Specificity & Relatability: The scenario must feel like a real daily situation (e.g. personal life, texts, neighbor requests, simple office asks) with specific names/details, not abstract boilerplate.
+5. Vague-vs-precise: The idealPrompt should be precise enough to guide a model to the exact target output, whereas a generic prompt would produce a noticeably different result.
+
+Compare the 3 candidates and select the index of the single best candidate (0, 1, or 2).`;
+
+  const userContent = `Here are the 3 candidate challenges generated for difficulty ${difficulty}:
+
+Candidate 0:
+Category: ${candidates[0].category}
+Skill: ${candidates[0].skill}
+Target Output: "${candidates[0].targetOutput}"
+Ideal Prompt: "${candidates[0].idealPrompt}"
+
+Candidate 1:
+Category: ${candidates[1].category}
+Skill: ${candidates[1].skill}
+Target Output: "${candidates[1].targetOutput}"
+Ideal Prompt: "${candidates[1].idealPrompt}"
+
+Candidate 2:
+Category: ${candidates[2].category}
+Skill: ${candidates[2].skill}
+Target Output: "${candidates[2].targetOutput}"
+Ideal Prompt: "${candidates[2].idealPrompt}"
+
+Select the index of the best candidate (0, 1, or 2) and justify your choice.`;
+
+  const response = await fetchGeminiWithFallback(GEMINI_GEN_MODEL, {
+    contents: [
+      { role: "user", parts: [{ text: userContent }] }
+    ],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: {
+      temperature: 0.2,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          reasoning: { type: "STRING", description: "Detailed comparison and reasoning for choice." },
+          bestIndex: { type: "INTEGER", description: "The index of the selected best candidate (0, 1, or 2)." }
+        },
+        required: ["reasoning", "bestIndex"]
+      }
+    }
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Critic API error: ${errText}`);
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+  const result = JSON.parse(text.trim());
+  const bestIdx = Number(result.bestIndex);
+  if (isNaN(bestIdx) || bestIdx < 0 || bestIdx > 2) {
+    return 0; // default fallback
+  }
+  return bestIdx;
 }
 
 async function generateAIChallenge(difficulty: string) {
-  const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
+  if (!GEMINI_KEY) throw new Error("GEMINI_API_KEY not set");
 
-  const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL_NAME") || "claude-3-5-haiku-20241022";
-
-  const scenario = pickScenario();
+  const scenario = await pickFreshScenario(difficulty);
 
   const difficultyGuidance: Record<string, string> = {
     BEGINNER:
@@ -558,6 +909,14 @@ async function generateAIChallenge(difficulty: string) {
     EXPERT:
       "Make the targetOutput require the player to INFER at least one implicit constraint that isn't stated outright but is obvious from reading the output itself (e.g. a strict word/character cap, a required prefix/suffix, a specific persona voice, or a structural rule like 'every item starts with a bolded action'). Combine tone + format + a specific exclusion or inclusion rule. The idealPrompt should be under ~200 characters but precise enough to reproduce the implicit constraint.",
   };
+
+  const pool = STATIC_FALLBACKS[difficulty.toUpperCase()] || [];
+  const fewShots = pool.map((item: any, idx) => `Example ${idx + 1}:
+Scenario Category: ${item.category}
+Tested Skill: ${item.skill}
+Impact Lesson: ${item.impactLesson}
+Target Output: "${item.targetOutput}"
+Ideal Prompt: "${item.idealPrompt}"`).join("\n\n");
 
   const systemPrompt = `You are a prompt-engineering challenge designer for PromptShot, a Wordle-style daily game where players see an AI-generated output and must guess the prompt that produced it.
 
@@ -573,85 +932,113 @@ Make it feel like something a real person would actually need today — specific
 
 TONE: Write with a light, modern, slightly witty voice where appropriate — this is a game, not a corporate style guide. But the targetOutput itself should read like something a real adult would send, not a joke.
 
-DIFFICULTY (${difficulty}): ${difficultyGuidance[difficulty] ?? difficultyGuidance.BEGINNER}
+FEW-SHOT EXAMPLES FOR ${difficulty} DIFFICULTY:
+${fewShots}
 
-CATEGORY SELECTION:
-Choose whichever of PARAGRAPH, CODE, LIST, ROLE, TONE, or CONSTRAINTS best fits the scenario above — don't force a mismatch. CODE should only be used for genuinely code-shaped scenarios (snippets, commit messages, review comments).`;
+DIFFICULTY (${difficulty}): ${difficultyGuidance[difficulty] ?? difficultyGuidance.BEGINNER}`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: 700,
-      system: systemPrompt,
-      tools: [
-        {
-          name: "create_challenge",
-          description: "Define the details of the generated prompt engineering challenge.",
-          input_schema: {
-            type: "object",
-            properties: {
-              category: {
-                type: "string",
-                enum: ["PARAGRAPH", "CODE", "LIST", "ROLE", "TONE", "CONSTRAINTS"],
-                description: "The category of the prompt challenge — pick the best fit for the scenario, do not force CODE unless genuinely code-shaped."
-              },
-              skill: {
-                type: "string",
-                description: "A short 2-4 word description of the prompt engineering skill being tested (e.g., 'Negative constraints', 'Role assignment', 'Implicit length cap')."
-              },
-              impactLesson: {
-                type: "string",
-                description: "A 1-sentence tip explaining how writing a single dense, well-structured prompt for this exact scenario avoids the usual 4-5 follow-up messages, and how that saves AI compute/tokens/energy."
-              },
-              targetOutput: {
-                type: "string",
-                description: "The exact, word-for-word output text (or code) the player must reverse-engineer. Must read like a polished, ready-to-send real-world deliverable with specific, concrete details (names, numbers, dates) — not generic placeholder text — and with no meta-commentary, disclaimers, or 'let me know if...' closers."
-              },
-              idealPrompt: {
-                type: "string",
-                description: "A single, dense reference prompt that, run once, reliably generates the targetOutput — packing in task, key specific details, tone/persona, and format/length constraints in one shot. Must respect the character limit implied by the difficulty guidance."
-              }
-            },
-            required: ["category", "skill", "impactLesson", "targetOutput", "idealPrompt"]
-          }
-        }
-      ],
-      tool_choice: {
-        type: "tool",
-        name: "create_challenge"
-      },
-      messages: [
-        {
-          role: "user",
-          content: `Generate today's prompt engineering challenge now.
+  const userContent = `Generate today's prompt engineering challenge candidates now.
+Generate 3 distinct candidates based on the scenario seed.
 
 Difficulty: ${difficulty}
 Scenario seed: ${scenario}
 
-Remember: the targetOutput must feel like a real, specific, ready-to-use message/snippet a person would actually send — concrete names, numbers, or details, not placeholders like "[Name]" or "a project". The idealPrompt must be the single, information-dense prompt that produces it in one shot.`
+Remember: each candidate's targetOutput must feel like a real, specific, ready-to-use message/snippet a person would actually send — concrete names, numbers, or details, not placeholders like "[Name]" or "a project". The idealPrompt must be the single, information-dense prompt that produces it in one shot.`;
+
+  const response = await fetchGeminiWithFallback(GEMINI_GEN_MODEL, {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: userContent }]
+      }
+    ],
+    systemInstruction: {
+      parts: [{ text: systemPrompt }]
+    },
+    generationConfig: {
+      temperature: 0.7,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "ARRAY",
+        description: "List of 3 distinct candidate challenges.",
+        items: {
+          type: "OBJECT",
+          properties: {
+            category: {
+              type: "STRING",
+              enum: ["PARAGRAPH", "CODE", "LIST", "ROLE", "TONE", "CONSTRAINTS"],
+              description: "The category of the prompt challenge."
+            },
+            skill: {
+              type: "STRING",
+              description: "A short 2-4 word description of the prompt engineering skill being tested."
+            },
+            impactLesson: {
+              type: "STRING",
+              description: "A 1-sentence tip explaining how writing a single dense prompt saves AI compute/tokens."
+            },
+            targetOutput: {
+              type: "STRING",
+              description: "The exact, word-for-word output text (or code) the player must reverse-engineer. Must read like a polished, ready-to-send real-world deliverable with specific details."
+            },
+            idealPrompt: {
+              type: "STRING",
+              description: "A single, dense reference prompt that reliably generates the targetOutput."
+            }
+          },
+          required: ["category", "skill", "impactLesson", "targetOutput", "idealPrompt"]
         }
-      ]
-    })
+      }
+    }
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Anthropic API error during challenge generation ${response.status}: ${err}`);
+    const errText = await response.text();
+    let parsedErr;
+    try {
+      parsedErr = JSON.parse(errText);
+    } catch (_) {
+      // ignore JSON parse error for raw text fallback
+    }
+    const msg = parsedErr?.error?.message || errText;
+    throw new Error(`Gemini API error during challenge generation ${response.status}: ${msg}`);
   }
 
   const data = await response.json();
-  const toolUseBlock = data.content?.find((block: any) => block.type === "tool_use");
-  if (!toolUseBlock || toolUseBlock.name !== "create_challenge") {
-    throw new Error(`Claude did not invoke the create_challenge tool. Response: ${JSON.stringify(data)}`);
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+  let candidates: any[];
+  try {
+    candidates = JSON.parse(text.trim());
+  } catch (err) {
+    console.error("Failed to parse Gemini generated challenge candidates list:", text, err);
+    throw new Error("Invalid Gemini generation response format");
   }
 
-  const result = toolUseBlock.input;
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    throw new Error("Gemini returned empty or invalid candidates list.");
+  }
+
+  // Filter candidates for placeholders
+  const validCandidates = candidates.filter(c => !hasPlaceholders(c.targetOutput) && !hasPlaceholders(c.idealPrompt));
+  if (validCandidates.length === 0) {
+    throw new Error("All generated candidates failed placeholder guardrail checks.");
+  }
+
+  let result;
+  if (validCandidates.length === 1) {
+    result = validCandidates[0];
+  } else {
+    // Pad to exactly 3 candidates for the critic
+    const criticInput = [...validCandidates];
+    while (criticInput.length < 3) {
+      criticInput.push(validCandidates[0]);
+    }
+    console.log(`[Challenge] Running critic pass on ${validCandidates.length} valid candidates...`);
+    const bestIdx = await runCritic(criticInput, difficulty);
+    result = criticInput[bestIdx];
+    console.log(`[Challenge] Critic selected candidate index ${bestIdx}`);
+  }
+
   const challengeId = `ai_${difficulty.toLowerCase()}_${Date.now()}`;
   return {
     id: challengeId,
@@ -688,12 +1075,16 @@ app.get("/make-server-488928a2/challenge", async (c) => {
     }
 
     if (!challenge) {
-      console.log(`Generating fresh AI challenge for ${difficulty} on ${today}...`);
-      challenge = await generateAIChallenge(difficulty);
+      console.log(`[Challenge] Cache miss for ${difficulty} on ${today} — generating and validating...`);
+      challenge = await generateValidatedChallenge(difficulty);
       try {
         await kv.mset(
-          [cacheKey, `challenge_id_${challenge.id}`],
+          [cacheKey, `challenge_id_${(challenge as any).id}`],
           [challenge, challenge]
+        );
+        console.log(
+          `[Challenge] Cached ${difficulty} challenge ` +
+          `(id: ${(challenge as any).id}, validationScore: ${(challenge as any).validationScore ?? "static"})`
         );
       } catch (err) {
         console.error("Failed to write generated challenge to KV store:", err);
