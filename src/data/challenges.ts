@@ -1,12 +1,12 @@
 export interface Challenge {
   id: string;
   category:
-    | "PARAGRAPH"
-    | "CODE"
-    | "LIST"
-    | "ROLE"
-    | "TONE"
-    | "CONSTRAINTS";
+  | "PARAGRAPH"
+  | "CODE"
+  | "LIST"
+  | "ROLE"
+  | "TONE"
+  | "CONSTRAINTS";
   difficulty: "BEGINNER" | "PRO" | "EXPERT";
   skill: string;
   impactLesson: string;
@@ -47,7 +47,7 @@ export const DAILY_CHALLENGES: Challenge[] = [
     skill: "Analogy builder",
     impactLesson: "Role directives like 'to a kid' establish default formatting and vocabulary assumptions, reducing description length.",
     targetOutput: "Imagine a clock on a super fast spaceship. To us watching from Earth, that clock ticks slower than ours. This happens because time bends when you travel close to the speed of light. It is called time dilation.",
-    idealPrompt: "Explain time dilation on a fast spaceship to a kid. Mention clocks ticking slower and speed of light in 3 sentences.",
+    idealPrompt: "Explain time dilation on a fast spaceship to a kid. Mention clocks ticking slower and speed of light.",
     charCount: 226,
     idealWaterMl: 11,
   },
@@ -261,7 +261,7 @@ export function getTodaysChallenge(): Challenge {
   const diff = now.getTime() - start.getTime();
   const oneDay = 1000 * 60 * 60 * 24;
   const dayOfYear = Math.floor(diff / oneDay);
-  
+
   const index = dayOfYear % DAILY_CHALLENGES.length;
   return DAILY_CHALLENGES[index];
 }

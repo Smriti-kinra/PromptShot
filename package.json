@@ -6,7 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "server": "deno run --allow-net --allow-env --allow-read --watch supabase/functions/server/index.ts",
+    "server": "deno run --allow-net --allow-env --allow-read --watch supabase/functions/make-server-488928a2/index.ts",
     "reset-db": "deno run --allow-net --allow-env utils/clear_db.ts"
   },
   "dependencies": {

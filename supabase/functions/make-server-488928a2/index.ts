@@ -22,6 +22,58 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
 
+function getCategoryForStaticChallenge(id: string): string {
+  const baseId = id.split("_")[0];
+  // b001, b006, e006 are PARAGRAPH
+  if (["b001", "b006", "e006"].includes(baseId)) return "PARAGRAPH";
+  // b002, b005, b007, p006, e005 are TONE
+  if (["b002", "b005", "b007", "p006", "e005"].includes(baseId)) return "TONE";
+  // b003, p004, p007, e002 are ROLE
+  if (["b003", "p004", "p007", "e002"].includes(baseId)) return "ROLE";
+  // b004, p002 are LIST
+  if (["b004", "p002"].includes(baseId)) return "LIST";
+  // p003, p005, e004 are CODE
+  if (["p003", "p005", "e004"].includes(baseId)) return "CODE";
+  // p001, e001, e003, e007 are CONSTRAINTS
+  if (["p001", "e001", "e003", "e007"].includes(baseId)) return "CONSTRAINTS";
+  return "PARAGRAPH";
+}
+
+async function ensureChallengeInDb(challenge: any) {
+  try {
+    const challengeId = challenge.id;
+    const targetOutput = challenge.targetOutput || challenge.target_output;
+    const idealPrompt = challenge.idealPrompt || challenge.ideal_prompt;
+    const idealWaterMl = challenge.idealWaterMl ?? challenge.ideal_water_ml ?? 12;
+    const difficulty = challenge.difficulty;
+    const category = challenge.category || getCategoryForStaticChallenge(challengeId);
+    const charCount = targetOutput ? targetOutput.length : 0;
+
+    const { error } = await supabaseAdmin
+      .from("challenges")
+      .upsert({
+        id: challengeId,
+        category: category,
+        difficulty: difficulty,
+        target_output: targetOutput,
+        ideal_prompt: idealPrompt,
+        char_count: charCount,
+        ideal_water_ml: idealWaterMl,
+        active: true
+      });
+    
+    if (error) {
+      console.error(`[ensureChallengeInDb] Upsert failed for challenge ${challengeId}:`, error.message);
+    } else {
+      console.log(`[ensureChallengeInDb] Successfully upserted challenge ${challengeId} into DB.`);
+    }
+  } catch (err) {
+    console.error("[ensureChallengeInDb] Exception while upserting challenge:", err);
+  }
+}
+
+
+
 // Initialize Gemini configuration
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 const GEMINI_SANDBOX_MODEL = Deno.env.get("GEMINI_SANDBOX_MODEL") || "gemini-2.5-flash";
@@ -59,6 +111,10 @@ function hasPlaceholders(text: string): boolean {
 
 app.get("/make-server-488928a2/health", (c) => c.json({ status: "ok" }));
 
+
+
+
+
 interface TokenUsage {
   input_tokens: number;
   output_tokens: number;
@@ -71,7 +127,7 @@ function estimateResources(usage?: TokenUsage) {
 
   // Estimating footprints dynamically based on token volume (300 tokens ≈ 10ml water)
   const waterMl = Math.max(1, Math.round(total * 0.033));
-  
+
 
   return { waterMl };
 }
@@ -367,20 +423,20 @@ function isCopyPasteAttempt(userPrompt: string, targetOutput: string): boolean {
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
   const promptNorm = normalize(userPrompt);
   const targetNorm = normalize(targetOutput);
-  
+
   const targetWords = targetNorm.split(/\s+/).filter(w => w.length > 4);
   if (targetWords.length === 0) return false;
   const promptWords = new Set(promptNorm.split(/\s+/));
   const overlap = targetWords.filter(w => promptWords.has(w)).length;
   const overlapRatio = overlap / targetWords.length;
-  
+
   return overlapRatio > 0.60;
 }
 
 function fallbackScore(userPrompt: string, targetOutput: string = "", difficulty: string = "BEGINNER") {
   const prompt = userPrompt.trim();
   const clean = prompt.toLowerCase();
-  
+
   if (clean.length < 10 || ["hi", "hello", "test", "hey", "prompt"].includes(clean)) {
     return {
       accuracy: 0,
@@ -397,40 +453,51 @@ function fallbackScore(userPrompt: string, targetOutput: string = "", difficulty
   const hasActionVerb = /\b(write|create|generate|draft|compose|list|explain|translate|summarize|describe|rewrite|format|act|respond|reply|produce)\b/i.test(prompt);
   const hasSubject = /\b(email|message|text|note|reply|response|list|checklist|paragraph|update|report|notice|post|announcement)\b/i.test(prompt);
   const hasTone = /\b(formal|informal|polite|direct|firm|professional|casual|friendly|urgent|brief|concise|short|under \d+|in \d+|words?|sentences?|bullet|numbered|markdown|code block)\b/i.test(prompt);
-  
-  const clarityScore = (hasActionVerb ? 20 : 0) 
-    + (hasSubject ? 15 : 0) 
+
+  const clarityScore = (hasActionVerb ? 20 : 0)
+    + (hasSubject ? 15 : 0)
     + (hasTone ? 15 : 0);
-  
+
   // Dimension 2: Format specification (0-20)
-  const hasFormatInstruction = /\b(list|numbered|bullets?|paragraph|table|code|markdown|format|structure|heading|line|item|step)\b/i.test(prompt);
+  // Infer the target's implicit format so plain-prose challenges aren't penalised
+  // when neither the target nor the ideal prompt needs explicit format keywords.
+  const targetIsCode = /```|\bdef |\bfunction |\bconst |\bvar |\blet |<!--|<\//.test(targetOutput);
+  const targetIsList = /^\s*(\d+\.|[-*•])/m.test(targetOutput);
+  const targetIsProse = !targetIsCode && !targetIsList;
+
+  const hasExplicitFormatInstruction = /\b(list|numbered|bullets?|paragraph|table|code|markdown|format|structure|heading|line|item|step)\b/i.test(prompt);
   const hasLengthInstruction = /\b(under|within|max|maximum|short|brief|concise|\d+ words?|\d+ sentences?|\d+ characters?)\b/i.test(prompt);
-  const formatScore = (hasFormatInstruction ? 12 : 0) 
-    + (hasLengthInstruction ? 8 : 0);
-  
+
+  // Baseline: award implicit format credit when prompt topic fits target format.
+  // Explicit format keywords bump it to full score.
+  const implicitFormatBase = targetIsProse ? 10 : targetIsList ? 8 : targetIsCode ? 8 : 8;
+  const formatScore = hasExplicitFormatInstruction
+    ? 12 + (hasLengthInstruction ? 8 : 0)
+    : implicitFormatBase + (hasLengthInstruction ? 8 : 0);
+
   // Dimension 3: Brevity (0-30) — ratio based
   const idealTokens = Math.max(15, Math.round(targetOutput.length / 8));
   const userTokens = Math.max(1, Math.round(prompt.length / 4));
   const tokenRatio = userTokens / idealTokens;
-  const brevityScore = tokenRatio <= 1.0 ? 30 
+  const brevityScore = tokenRatio <= 1.0 ? 30
     : tokenRatio <= 1.5 ? Math.round(30 * (1 - (tokenRatio - 1.0) * 2))
-    : 0;
-  
+      : 0;
+
   // Apply scaling factor (minimum 0.4 floor instead of 0)
-  const scalingFactor = clarityScore > 0 ? 
+  const scalingFactor = clarityScore > 0 ?
     Math.max(0.4, clarityScore / 50) : 0;
-  
-  const rawTotal = clarityScore 
-    + Math.round(formatScore * scalingFactor) 
+
+  const rawTotal = clarityScore
+    + Math.round(formatScore * scalingFactor)
     + Math.round(brevityScore * scalingFactor);
-  
+
   const DIFFICULTY_BONUS: Record<string, number> = { BEGINNER: 0, PRO: 5, EXPERT: 10 };
   const total = Math.min(100, rawTotal + (DIFFICULTY_BONUS[difficulty.toUpperCase()] ?? 0));
-  
+
   const estTokens = userTokens + Math.round(targetOutput.length / 4);
   const waterMl = Math.max(1, Math.round(estTokens * 0.033));
-  
-  
+
+
   return {
     accuracy: Math.min(50, clarityScore),
     format: Math.min(20, Math.round(formatScore * scalingFactor)),
@@ -694,7 +761,7 @@ async function validateIdealPrompt(candidate: {
   const brevityBonus = 30; // full credit — it's meant to be a short prompt
 
   const total = Math.min(100, semantic + keyword + structure + brevityBonus);
-  
+
   const { waterMl } = estimateResources({
     input_tokens: sandbox.promptTokens,
     output_tokens: sandbox.completionTokens,
@@ -730,7 +797,7 @@ const STATIC_FALLBACKS: Record<string, object[]> = {
     {
       id: "b003", difficulty: "BEGINNER",
       targetOutput: "Imagine a clock on a super fast spaceship. To us watching from Earth, that clock ticks slower than ours. This happens because time bends when you travel close to the speed of light. It is called time dilation.",
-      idealPrompt: "Explain time dilation on a fast spaceship to a kid. Mention clocks ticking slower and speed of light in 3 sentences.",
+      idealPrompt: "Explain time dilation on a fast spaceship to a kid. Mention clocks ticking slower and speed of light.",
       idealWaterMl: 11,
     },
     {
@@ -825,7 +892,7 @@ const STATIC_FALLBACKS: Record<string, object[]> = {
       id: "e004", difficulty: "EXPERT",
       targetOutput: "```python\ndef get_primes(numbers):\n    # Filter and return list of prime numbers\n    def is_prime(n):\n        if n < 2: return False\n        for i in range(2, int(n**0.5) + 1):\n            if n % i == 0: return False\n        return True\n    return [num for num in numbers if is_prime(num)]\n```",
       idealPrompt: "Write a Python function get_primes(numbers) that filters a list for primes. Include a helper function is_prime, use square root limit for efficiency, and add a single comment.",
-      idealWaterMl: 121,
+      idealWaterMl: 12,
     },
     {
       id: "e005", difficulty: "EXPERT",
@@ -843,37 +910,37 @@ const STATIC_FALLBACKS: Record<string, object[]> = {
       id: "e007", difficulty: "EXPERT",
       targetOutput: "The Rosetta Stone, discovered in 1799 by French soldiers in Egypt, is a granodiorite stele inscribed with three scripts: Hieroglyphic, Demotic, and Ancient Greek. This trilingual decree allowed scholars like Champollion to decode Egyptian hieroglyphs by comparing them to the Greek text.",
       idealPrompt: "Explain how the Rosetta Stone was discovered and used to decode hieroglyphs. Mention the three scripts, the year of discovery, and Champollion's contribution. Under 55 words.",
-      idealWaterMl: 121,
+      idealWaterMl: 12,
     },
   ]
 };
 
-  // ─── fallback selector ─────────────────────────────────────────────────────
-  /**
-   * Returns a static fallback challenge for the given difficulty, rotating by
-   * day-of-year so the same challenge doesn't appear on consecutive fallback days.
-   * Properly stamps unique ID and sets both camelCase and snake_case properties.
-   */
-  function getStaticFallbackChallenge(difficulty: string): any {
-    const key = difficulty.toUpperCase();
-    const pool = STATIC_FALLBACKS[key] ?? STATIC_FALLBACKS["BEGINNER"];
-    const dayOfYear = Math.floor(
-      (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
-    );
-    const picked = pool[dayOfYear % pool.length] as any;
-    const todayStr = new Date().toISOString().split("T")[0];
-    
-    return {
-      ...picked,
-      id: `${picked.id}_${todayStr}`,
-      target_output: picked.targetOutput,
-      ideal_prompt: picked.idealPrompt,
-      ideal_water_ml: picked.idealWaterMl,
-      char_count: picked.targetOutput.length,
-      charCount: picked.targetOutput.length,
-      active: true,
-    };
-  }
+// ─── fallback selector ─────────────────────────────────────────────────────
+/**
+ * Returns a static fallback challenge for the given difficulty, rotating by
+ * day-of-year so the same challenge doesn't appear on consecutive fallback days.
+ * Properly stamps unique ID and sets both camelCase and snake_case properties.
+ */
+function getStaticFallbackChallenge(difficulty: string): any {
+  const key = difficulty.toUpperCase();
+  const pool = STATIC_FALLBACKS[key] ?? STATIC_FALLBACKS["BEGINNER"];
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
+  );
+  const picked = pool[dayOfYear % pool.length] as any;
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  return {
+    ...picked,
+    id: `${picked.id}_${todayStr}`,
+    target_output: picked.targetOutput,
+    ideal_prompt: picked.idealPrompt,
+    ideal_water_ml: picked.idealWaterMl,
+    char_count: picked.targetOutput.length,
+    charCount: picked.targetOutput.length,
+    active: true,
+  };
+}
 
 /**
  * Generates an AI challenge and immediately validates its idealPrompt by
@@ -1196,12 +1263,14 @@ app.get("/make-server-488928a2/challenge", async (c) => {
         );
         console.log(
           `[Challenge] Cached ${difficulty} challenge ` +
-          `(id: ${(challenge as any).id}, validationScore: ${(challenge as any).validationScore ?? "static"})`
+          `(id: ${(challenge as any).id})`
         );
       } catch (err) {
         console.error("Failed to write generated challenge to KV store:", err);
       }
     }
+
+    await ensureChallengeInDb(challenge);
 
     return c.json(challenge);
   } catch (err: any) {
@@ -1209,5 +1278,36 @@ app.get("/make-server-488928a2/challenge", async (c) => {
     return c.json({ error: err.message || String(err) }, 500);
   }
 });
+
+// Seed all static challenges in the background on startup
+setTimeout(async () => {
+  try {
+    console.log("[Seed] Starting startup seeding of 21 static challenges...");
+    for (const difficulty of ["BEGINNER", "PRO", "EXPERT"]) {
+      const pool = STATIC_FALLBACKS[difficulty] || [];
+      for (const item of pool as any[]) {
+        const charCount = item.targetOutput.length;
+        const { error } = await supabaseAdmin
+          .from("challenges")
+          .upsert({
+            id: item.id,
+            category: item.category || getCategoryForStaticChallenge(item.id),
+            difficulty: item.difficulty,
+            target_output: item.targetOutput,
+            ideal_prompt: item.idealPrompt,
+            char_count: charCount,
+            ideal_water_ml: item.idealWaterMl,
+            active: true
+          });
+        if (error) {
+          console.error(`[Seed] Failed to upsert static challenge ${item.id}:`, error.message);
+        }
+      }
+    }
+    console.log("[Seed] Startup seeding completed.");
+  } catch (err) {
+    console.error("[Seed] Startup seeding threw error:", err);
+  }
+}, 1000);
 
 Deno.serve(app.fetch);

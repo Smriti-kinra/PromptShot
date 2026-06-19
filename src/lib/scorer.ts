@@ -110,10 +110,21 @@ export function mockScore(userPrompt: string, targetOutput: string = "", difficu
     + (hasTone ? 15 : 0);
   
   // Dimension 2: Format specification (0-20)
-  const hasFormatInstruction = /\b(list|numbered|bullets?|paragraph|table|code|markdown|format|structure|heading|line|item|step)\b/i.test(prompt);
+  // Infer the target's implicit format so plain-prose challenges aren't penalised
+  // when neither the target nor the ideal prompt needs explicit format keywords.
+  const targetIsCode = /```|\bdef |\bfunction |\bconst |\bvar |\blet |<!--|<\//.test(targetOutput);
+  const targetIsList = /^\s*(\d+\.|[-*•])/m.test(targetOutput);
+  const targetIsProse = !targetIsCode && !targetIsList;
+
+  const hasExplicitFormatInstruction = /\b(list|numbered|bullets?|paragraph|table|code|markdown|format|structure|heading|line|item|step)\b/i.test(prompt);
   const hasLengthInstruction = /\b(under|within|max|maximum|short|brief|concise|\d+ words?|\d+ sentences?|\d+ characters?)\b/i.test(prompt);
-  const formatScore = (hasFormatInstruction ? 12 : 0) 
-    + (hasLengthInstruction ? 8 : 0);
+
+  // Baseline: award implicit format credit when prompt topic fits target format.
+  // Explicit format keywords bump it to full score.
+  const implicitFormatBase = targetIsProse ? 10 : targetIsList ? 8 : targetIsCode ? 8 : 8;
+  const formatScore = hasExplicitFormatInstruction
+    ? 12 + (hasLengthInstruction ? 8 : 0)
+    : implicitFormatBase + (hasLengthInstruction ? 8 : 0);
   
   // Dimension 3: Brevity (0-30) — ratio based
   const idealTokens = Math.max(15, Math.round(targetOutput.length / 8));

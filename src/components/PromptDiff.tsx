@@ -176,7 +176,7 @@ export function PromptDiff({ userPrompt, idealPrompt }: PromptDiffProps) {
                     display: "inline-block",
                   }}
                 >
-                  {t.text}
+                  {t.idealText ?? t.text}
                 </span>
               ))}
           </div>

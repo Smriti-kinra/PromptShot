@@ -76,7 +76,7 @@ function getScoreFeedback(
       return {
         dim: "Format",
         label: "REVIEW: No structure specified",
-        tip: 'Your prompt gave no formatting instructions. Tell the AI the exact output shape — e.g. "as a numbered list", "in a markdown table", "in 3 sentences", or "as a JSON object".',
+        tip: 'Your prompt gave no formatting instructions. Tell the AI the exact output shape — e.g. "as a numbered list", "in a markdown table", or "in 3 sentences".',
       };
     if (fmtPct < 75)
       return {
@@ -382,7 +382,7 @@ export function ResultsScreen({
             <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)", lineHeight: "1.55" }}>
               {fb.tip}
             </div>
-            {score.sandboxOutput && (
+            {score.sandboxOutput && !score.sandboxOutput.trim().startsWith("[") && (
               <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                 <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--ps-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)", marginBottom: "4px" }}>
                   Output produced by your prompt:

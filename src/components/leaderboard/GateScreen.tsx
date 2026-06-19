@@ -31,8 +31,6 @@ function friendlyError(raw: string): string {
   const msg = raw.toLowerCase();
   if (msg.includes("invalid login credentials") || msg.includes("invalid credentials"))
     return "Incorrect email or password.";
-  if (msg.includes("email not confirmed"))
-    return "Please confirm your email before signing in.";
   if (msg.includes("user already registered") || msg.includes("already registered"))
     return "An account with this email already exists. Sign in instead.";
   if (msg.includes("password should be"))
@@ -140,16 +138,11 @@ export function GateScreen({ onClose }: GateScreenProps) {
 
     setAuthLoading(true);
 
-    // Check if email already exists by attempting to sign in first
-    // (Supabase doesn't expose a direct "email exists" check for security reasons,
-    //  but signUp with `options.emailRedirectTo` suppresses confirmation and
-    //  returns identityData — if the user already exists it returns the same user.)
     const { data, error: signUpErr } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
       options: {
         data: { display_name: cleanName },
-        emailRedirectTo: window.location.origin,
       },
     });
 
@@ -159,7 +152,6 @@ export function GateScreen({ onClose }: GateScreenProps) {
       return;
     }
 
-    // Supabase returns a user even if they already exist (with email confirmation on).
     // Detect duplicate: identities array is empty when email is already registered.
     if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
       setError("An account with this email already exists. Sign in instead.");
@@ -167,17 +159,29 @@ export function GateScreen({ onClose }: GateScreenProps) {
       return;
     }
 
-    // Persist display_name to the profiles table as well (if it exists)
+    // Persist display_name to profiles table
     if (data.user) {
       await supabase
         .from("profiles")
         .upsert({ id: data.user.id, display_name: cleanName }, { onConflict: "id" });
     }
 
+    // Auto sign-in immediately — no email confirmation required
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
     setAuthLoading(false);
-    setInfo("Account created! Check your email to confirm, then sign in.");
-    switchMode("signin");
-  }, [email, displayName, password, confirm]);
+
+    if (signInErr) {
+      // Sign-up succeeded but auto sign-in failed (e.g. confirmation still enabled on server)
+      setInfo("Account created! Sign in to continue.");
+      switchMode("signin");
+    } else {
+      onClose();
+    }
+  }, [email, displayName, password, confirm, onClose]);
 
   // ── sign-in ──────────────────────────────────────────────────────────────────
 
