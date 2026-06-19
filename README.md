@@ -16,7 +16,7 @@ Every time you write a lazy, wordy prompt and hit enter 5 times to correct the A
    - 🎯 **Accuracy (50 pts)**: Did the output match the target meaning?
    - 📋 **Format (20 pts)**: Did you enforce structural rules?
    - ⚡ **Brevity (30 pts)**: How short and efficient was your prompt?
-4. **See the Eco-Impact**: Watch your prompt's water consumption and carbon footprint calculate in real-time.
+4. **See the Eco-Impact**: Watch your prompt's water consumption calculate in real-time.
 
 ---
 

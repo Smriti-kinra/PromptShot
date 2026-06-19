@@ -18,7 +18,7 @@ PromptShot uses a curated forest-green theme with strict styling boundaries.
 
 ## Two-World Color Rule
 * **Amber (#F59E0B)**: Exclusively for game, score, bullseye, streak, difficulty badge, and prompt submission actions.
-* **Teal (#0EA79A)**: Exclusively for environmental metrics, carbon & water estimations, and the eco impact card.
+* **Teal (#0EA79A)**: Exclusively for environmental metrics, water estimations, and the eco impact card.
 * **Mint (#6EE09B)**: Used as a neutral bright accent or success/action highlight.
 * **Never mix amber and teal inside components.**
 

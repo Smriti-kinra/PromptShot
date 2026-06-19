@@ -17,8 +17,8 @@ interface ResultsScreenProps {
   showAutoIdeal: boolean;
   idealPrompt: string;
   userPrompt: string;
-  personalSavings: { waterMl: number; co2Grams: number };
-  communitySavings: { waterLiters: number; co2Kg: number };
+  personalSavings: { waterMl: number };
+  communitySavings: { waterLiters: number };
   onShare: () => void;
   onBackToMenu: () => void;
   challenge?: Challenge | null;

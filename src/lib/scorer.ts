@@ -6,7 +6,6 @@ export interface ScoreResult {
   brevity: number;    // 0–30 (Token + Latency)
   total: number;      // sum of above (0-100)
   waterMl: number;    
-  co2Grams: number;   
   idealPrompt?: string;
   justification?: string;
   feedback?: string;
@@ -20,7 +19,6 @@ function clampScore(raw: {
   brevity: number;
   total: number;
   waterMl: number;
-  co2Grams: number;
   idealPrompt?: string;
   justification?: string;
   feedback?: string;
@@ -36,7 +34,6 @@ function clampScore(raw: {
     brevity,
     total,
     waterMl:  Math.max(1,    raw.waterMl),
-    co2Grams: Math.max(0.01, raw.co2Grams),
     idealPrompt:   raw.idealPrompt,
     justification: raw.justification,
     feedback:      raw.feedback,
@@ -71,7 +68,6 @@ export function mockScore(userPrompt: string, targetOutput: string = "", difficu
       brevity: 0,
       total: 0,
       waterMl: 1,
-      co2Grams: 0.01,
       justification: "The prompt was too short or contained only greeting words.",
       feedback: "Try writing a prompt with specific instructions and subject matter.",
     };
@@ -96,7 +92,6 @@ export function mockScore(userPrompt: string, targetOutput: string = "", difficu
           brevity: 0,
           total: 0,
           waterMl: 1,
-          co2Grams: 0.01,
           justification: "Prompt appears to reproduce the target output directly. Describe what to produce, do not reproduce it.",
           feedback: "Try writing instructions that describe the tone, format, and subject matter — not the output itself.",
           sandboxOutput: "[Copy-paste attempt blocked. Describe the output instead of copying it.]",
@@ -141,7 +136,6 @@ export function mockScore(userPrompt: string, targetOutput: string = "", difficu
   
   const estTokens = userTokens + Math.round(targetOutput.length / 4);
   const waterMl = Math.max(1, Math.round(estTokens * 0.033));
-  const co2Grams = Math.max(0.01, parseFloat((estTokens * 0.00033).toFixed(3)));
   
   return clampScore({
     accuracy: Math.min(50, clarityScore),
@@ -149,7 +143,6 @@ export function mockScore(userPrompt: string, targetOutput: string = "", difficu
     brevity: Math.min(30, Math.round(brevityScore * scalingFactor)),
     total,
     waterMl,
-    co2Grams,
     justification: "Programmatic evaluation simulation applied.",
     feedback: hasActionVerb && hasSubject && hasTone
       ? "Strong prompt structure detected — try the live scorer for full AI evaluation."
@@ -206,7 +199,6 @@ export async function scorePrompt(
       brevity: data.brevity,
       total: data.total,
       waterMl: data.waterMl ?? 10,
-      co2Grams: data.co2Grams ?? 0.1,
       idealPrompt: data.idealPrompt,
       justification: data.justification,
       feedback: data.feedback,
@@ -278,7 +270,6 @@ export async function simulateScore(
       brevity: res.brevity,
       total: res.total,
       waterMl: res.waterMl ?? 10,
-      co2Grams: res.co2Grams ?? 0.1,
       idealPrompt: res.idealPrompt,
       justification: res.justification,
       feedback: res.feedback,

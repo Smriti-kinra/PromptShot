@@ -5,9 +5,9 @@ import { ExplainerType, getExplainerConfig } from "./explainerConfig";
 interface ImpactExplainerModalProps {
   type: ExplainerType;
   onClose: () => void;
-  score?: { waterMl: number; co2Grams: number };
-  personal?: { waterMl: number; co2Grams: number };
-  community?: { waterLiters: number; co2Kg: number };
+  score?: { waterMl: number };
+  personal?: { waterMl: number };
+  community?: { waterLiters: number };
 }
 
 export function ImpactExplainerModal({

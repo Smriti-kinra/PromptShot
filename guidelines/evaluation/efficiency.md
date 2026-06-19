@@ -42,9 +42,7 @@ Latency/response speed is no longer factored into the player's brevity score to 
 
 ## 4. Resource Footprint Estimation
 
-The server estimates cooling water evaporated and carbon dioxide generated dynamically based on the sandbox token volume (input + output tokens):
+The server estimates cooling water evaporated dynamically based on the sandbox token volume (input + output tokens):
 
 * **Water Footprint**: 
   $$\text{waterMl} = \max(1, \text{Math.round}(\text{total\_tokens} \times 0.033))$$
-* **Carbon Footprint**: 
-  $$\text{co2Grams} = \max(0.01, \text{total\_tokens} \times 0.00033)$$

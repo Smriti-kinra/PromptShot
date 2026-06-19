@@ -7,8 +7,7 @@ This document details the scientific research, system architectures, mathematica
 ## Table of Contents
 1. [Environmental Impact Modeling & Scientific Citations](#1-environmental-impact-modeling--scientific-citations)
    - [A. Water Footprint (Thermal Cooling)](#a-water-footprint-thermal-cooling)
-   - [B. Carbon Footprint (Greenhouse Gas Emissions)](#b-carbon-footprint-greenhouse-gas-emissions)
-   - [C. Sandbox Execution Determinism](#c-sandbox-execution-determinism)
+   - [B. Sandbox Execution Determinism](#b-sandbox-execution-determinism)
 2. [Challenge Content Generation & Vetting](#2-challenge-content-generation--vetting)
    - [A. Curation Strategy](#a-curation-strategy)
    - [B. Categorization & Difficulty Levels](#b-categorization--difficulty-levels)
@@ -38,9 +37,9 @@ PromptShot quantifies the environmental footprint of AI prompt engineering. We t
                  ▼
     [Gemini 2.5 Flash Sandbox] ────► Total Sandbox Tokens (Input + Output)
                  │                                  │
-                 ▼                                  ├─► Water Evaporated: 0.033 ml / token
-      [Raw Sandbox Output]                          │
-                 │                                  └─► CO2 Emitted: 0.00033 g / token
+                 ▼                                  └─► Water Evaporated: 0.033 ml / token
+      [Raw Sandbox Output]
+                 │
                  ▼
     [Gemini 2.5 Flash Judge]
 ```
@@ -56,17 +55,7 @@ PromptShot quantifies the environmental footprint of AI prompt engineering. We t
   - PromptShot applies a conservative coefficient of **0.033ml of fresh water per token** processed (encompassing both input prompt tokens and sandbox completion tokens) to scale water calculations dynamically.
   - This calculation represents *direct cooling water* consumed at the data center site and does not factor in the indirect water consumption at the power generation plants feeding the grid.
 
-### B. Carbon Footprint (Greenhouse Gas Emissions)
-* **Mathematical Formula**:
-  $$\text{co2Grams} = \max(0.01, \text{totalTokens} \times 0.00033)$$
-* **Scientific Citation**:
-  Derived from **"Estimating the Carbon Footprint of BLOOM, a 176-Billion Parameter Language Model"** (Luccioni, Ross, and Jernite; Hugging Face, 2023), alongside hardware data sheets outlining the thermal design power (TDP) of Nvidia A100/H100 GPUs during active batch inference.
-* **Footprint Rationale**:
-  - A standard modern GPU-accelerated server query consumes approximately **0.0002 to 0.001 kWh of electricity**, depending on server load, sequence length, concurrency, and architecture.
-  - Applying the global average carbon intensity of electricity grids (approximately **350g to 400g CO2 per kWh**), the carbon emission rate scales to **0.00033 grams of CO2 per token**.
-  - Linking calculations directly to token volume (rather than character counts) guarantees that the carbon metric mirrors the actual computational workload requested of the hardware.
-
-### C. Sandbox Execution Determinism
+### B. Sandbox Execution Determinism
 * To ensure ecological credibility and grade reproducibility, players must get identical scores for identical inputs.
 * The Sandbox is configured with `temperature: 0.0` and a static `seed: 42`. This removes non-deterministic output sampling, securing a stable environment for mathematical efficiency grading.
 
@@ -99,7 +88,7 @@ Challenges are split across three difficulty tiers:
 3. **EXPERT**: Hard logical boundaries, programmatic prime filters, or Taylor Swift style lyric parodies.
 
 ### C. Baseline Footprint Computations
-Every challenge in [challenges.ts](file:///Users/smriti/Documents/GitHub/promptshot/src/data/challenges.ts) contains pre-calculated properties for `idealWaterMl` and `idealCo2Grams`.
+Every challenge in [challenges.ts](file:///Users/smriti/Documents/GitHub/promptshot/src/data/challenges.ts) contains pre-calculated properties for `idealWaterMl`.
 * These baseline resource costs are determined by executing the challenge's `idealPrompt` through the execution sandbox.
 * The resulting total token usage (input + completion) is multiplied by our coefficients to establish the baseline against which the player's attempt is measured.
 

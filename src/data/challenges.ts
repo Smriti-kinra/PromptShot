@@ -14,7 +14,6 @@ export interface Challenge {
   idealPrompt: string;
   charCount: number;
   idealWaterMl?: number;
-  idealCo2Grams?: number;
 }
 
 export const DAILY_CHALLENGES: Challenge[] = [
@@ -29,7 +28,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Explain what a black hole and its event horizon are in three sentences. Mention that gravity prevents light from escaping.",
     charCount: 251,
     idealWaterMl: 11,
-    idealCo2Grams: 0.111
   },
   {
     id: "b002",
@@ -41,7 +39,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Text to Priya canceling tonight, headache, apologize, suggest rescheduling next weekend.",
     charCount: 184,
     idealWaterMl: 10,
-    idealCo2Grams: 0.105
   },
   {
     id: "b003",
@@ -53,7 +50,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Explain time dilation on a fast spaceship to a kid. Mention clocks ticking slower and speed of light in 3 sentences.",
     charCount: 226,
     idealWaterMl: 11,
-    idealCo2Grams: 0.109
   },
   {
     id: "b004",
@@ -65,7 +61,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "List exactly 10 fantasy last names starting with capital letters, paired with first name Edrik, separated by commas.",
     charCount: 180,
     idealWaterMl: 11,
-    idealCo2Grams: 0.106
   },
   {
     id: "b005",
@@ -77,7 +72,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Roommate text politely asking to wash pots and pans tonight because sink is full and morning breakfast prep is hard.",
     charCount: 211,
     idealWaterMl: 11,
-    idealCo2Grams: 0.107
   },
   {
     id: "b006",
@@ -89,7 +83,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Answer the riddle: if it takes 30 mins to dry 5 shirts, how long to dry 10? Explain that they dry at the same time.",
     charCount: 198,
     idealWaterMl: 11,
-    idealCo2Grams: 0.107
   },
   {
     id: "b007",
@@ -101,7 +94,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Rewrite dry technical baking soda details into a warm, feature-focused blurb highlighting safety for kids and pets.",
     charCount: 190,
     idealWaterMl: 11,
-    idealCo2Grams: 0.107
   },
 
   // PRO
@@ -115,7 +107,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Compare CUDA and OpenCL programming models. Highlight hardware compatibility and performance, and provide a recommendation. Under 50 words.",
     charCount: 298,
     idealWaterMl: 12,
-    idealCo2Grams: 0.118
   },
   {
     id: "p002",
@@ -127,7 +118,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "List 3 creative, legal ways a student can earn income using a gaming PC. Use numbered list with bold titles and short descriptions.",
     charCount: 292,
     idealWaterMl: 12,
-    idealCo2Grams: 0.116
   },
   {
     id: "p003",
@@ -139,7 +129,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Write a bash script containing a while loop that pings 8.8.8.8. If it fails, log timestamped failure message to ping_errors.log. Sleep 5s.",
     charCount: 227,
     idealWaterMl: 11,
-    idealCo2Grams: 0.111
   },
   {
     id: "p004",
@@ -151,7 +140,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Explain public key cryptography using a mailbox lock-and-key analogy. Cover how public and private keys operate to secure messages.",
     charCount: 294,
     idealWaterMl: 12,
-    idealCo2Grams: 0.116
   },
   {
     id: "p005",
@@ -163,7 +151,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Write a clean CSS .card block with glassmorphism (translucent background, blur), white border, rounded corners, drop shadow, and padding.",
     charCount: 232,
     idealWaterMl: 11,
-    idealCo2Grams: 0.114
   },
   {
     id: "p006",
@@ -175,7 +162,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Group chat: 4 people Venmo Zara $47.50 for Airbnb deposit by Wednesday, booking deadline Thursday night, casual but urgent.",
     charCount: 236,
     idealWaterMl: 11,
-    idealCo2Grams: 0.111
   },
   {
     id: "p007",
@@ -187,7 +173,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Polite cold email to Professor Okafor: sophomore, loved his decision fatigue talk, ask about undergraduate research assistant openings next semester.",
     charCount: 297,
     idealWaterMl: 12,
-    idealCo2Grams: 0.117
   },
 
   // EXPERT
@@ -201,7 +186,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Recommend 3 video games (with short parenthetical descriptions) for a fan of the TV show Dark, focusing on mystery, time-travel, and dark atmosphere. Under 60 words.",
     charCount: 298,
     idealWaterMl: 12,
-    idealCo2Grams: 0.119
   },
   {
     id: "e002",
@@ -213,7 +197,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Write Swift-style song lyrics about soggy/sweaty underpants during a hot summer. Incorporate dramatic Midnights/Cruel Summer themes. Under 55 words.",
     charCount: 298,
     idealWaterMl: 12,
-    idealCo2Grams: 0.116
   },
   {
     id: "e003",
@@ -225,7 +208,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Explain how L2 regularization prevents machine learning overfitting. Focus on the penalty term, weight magnitudes, and decision boundary smoothing. Keep it precise and technical.",
     charCount: 296,
     idealWaterMl: 12,
-    idealCo2Grams: 0.12
   },
   {
     id: "e004",
@@ -237,7 +219,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Write a Python function get_primes(numbers) that filters a list for primes. Include a helper function is_prime, use square root limit for efficiency, and add a single comment.",
     charCount: 301,
     idealWaterMl: 12,
-    idealCo2Grams: 0.121
   },
   {
     id: "e005",
@@ -249,7 +230,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Polite but urgent maintenance request to landlord: bathroom sink leaking since last week, water pooling and cabinet damage, ask for quick fix to prevent further damage.",
     charCount: 292,
     idealWaterMl: 12,
-    idealCo2Grams: 0.119
   },
   {
     id: "e006",
@@ -261,7 +241,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Solve this riddle: a warm bowl of soup and ice cube are put in a box in a 0°C truck. What happens to the soup and ice? Explain thermal equilibrium and freezing point.",
     charCount: 299,
     idealWaterMl: 12,
-    idealCo2Grams: 0.12
   },
   {
     id: "e007",
@@ -273,7 +252,6 @@ export const DAILY_CHALLENGES: Challenge[] = [
     idealPrompt: "Explain how the Rosetta Stone was discovered and used to decode hieroglyphs. Mention the three scripts, the year of discovery, and Champollion's contribution. Under 55 words.",
     charCount: 296,
     idealWaterMl: 12,
-    idealCo2Grams: 0.121
   }
 ];
 

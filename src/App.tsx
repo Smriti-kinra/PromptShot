@@ -242,9 +242,9 @@ export default function App() {
     }
   };
 
-  const [personalSavings, setPersonalSavings] = useState<{ waterMl: number; co2Grams: number }>({ waterMl: 0, co2Grams: 0 });
+  const [personalSavings, setPersonalSavings] = useState<{ waterMl: number }>({ waterMl: 0 });
   // Baseline is demo data seeded at launch; real community deltas are added on top
-  const [communitySavings, setCommunitySavings] = useState<{ waterLiters: number; co2Kg: number }>({ waterLiters: 12450, co2Kg: 124.5 });
+  const [communitySavings, setCommunitySavings] = useState<{ waterLiters: number }>({ waterLiters: 12450 });
 
   const [challenge, setChallenge] = useState<import("../lib/supabase").Challenge | null>(null);
   const [isPlayingStarted, setIsPlayingStarted] = useState(false);
@@ -302,7 +302,6 @@ export default function App() {
       const today = new Date().toISOString().split("T")[0];
       let hasPlayed = false;
       let localSavedWater = 0;
-      let localSavedCo2 = 0;
 
       if (session) {
         const { data: profile } = await supabase
@@ -322,13 +321,12 @@ export default function App() {
 
         const { data: userScores } = await supabase
           .from("scores")
-          .select("water_ml, co2_grams")
+          .select("water_ml")
           .eq("user_id", session.user.id);
 
         if (userScores) {
           userScores.forEach((s) => {
             localSavedWater += (50 - (s.water_ml ?? 10));
-            localSavedCo2 += (0.5 - (s.co2_grams ?? 0.1));
           });
         }
       } else {
@@ -340,31 +338,28 @@ export default function App() {
 
         history.forEach((s) => {
           localSavedWater += (50 - (s.waterMl ?? 10));
-          localSavedCo2 += (0.5 - (s.co2Grams ?? 0.1));
         });
       }
 
       console.debug("[PromptShot] Init — hasPlayed:", hasPlayed, "→ routing to:", hasPlayed ? "already-played" : "challenge");
 
-      setPersonalSavings({ waterMl: Math.max(0, localSavedWater), co2Grams: Math.max(0, localSavedCo2) });
+      setPersonalSavings({ waterMl: Math.max(0, localSavedWater) });
       setHasPlayedToday(hasPlayed);
 
       // Fetch global community savings
       let globalWaterMl = 0;
-      let globalCo2G = 0;
       try {
-        const { data: allScores, error } = await supabase.from("scores").select("water_ml, co2_grams");
+        const { data: allScores, error } = await supabase.from("scores").select("water_ml");
         if (!error && allScores) {
           allScores.forEach((s) => {
             globalWaterMl += (50 - (s.water_ml ?? 10));
-            globalCo2G += (0.5 - (s.co2_grams ?? 0.1));
           });
         }
       } catch (err) {
         console.error("Error fetching global scores:", err);
       }
 
-      setCommunitySavings({ waterLiters: 12450 + (globalWaterMl / 1000), co2Kg: 124.5 + (globalCo2G / 1000) });
+      setCommunitySavings({ waterLiters: 12450 + (globalWaterMl / 1000) });
 
       // Secure: only include ideal_prompt if already played
       const selectFields = hasPlayed
@@ -395,7 +390,6 @@ export default function App() {
             brevity:  bre,
             total:    Math.min(100, acc + fmt + bre),
             waterMl:  Math.max(1,    existingScore.water_ml  ?? 10),
-            co2Grams: Math.max(0.01, existingScore.co2_grams ?? 0.1),
           });
           if (existingScore.user_prompt) setUserPrompt(existingScore.user_prompt);
         }
@@ -411,7 +405,6 @@ export default function App() {
             brevity:  bre,
             total:    Math.min(100, acc + fmt + bre),
             waterMl:  Math.max(1,    todayEntry.waterMl  ?? 10),
-            co2Grams: Math.max(0.01, todayEntry.co2Grams ?? 0.1),
           });
           if (todayEntry.user_prompt) setUserPrompt(todayEntry.user_prompt);
         }
@@ -468,7 +461,6 @@ export default function App() {
         user_prompt: userPrompt,
         played_at: today,
         water_ml: result.waterMl,
-        co2_grams: result.co2Grams,
       });
       console.debug("[PromptShot] Score insert result — error:", insertErr, "played_at:", today);
 
@@ -487,7 +479,6 @@ export default function App() {
         challenge_id: challenge.id,
         user_prompt: userPrompt,
         waterMl: result.waterMl,
-        co2Grams: result.co2Grams,
       });
 
       const newStreak = calculateLocalStreak();
@@ -498,9 +489,8 @@ export default function App() {
     if (result.idealPrompt) setIdealPrompt(result.idealPrompt);
 
     const savedWaterThisTurn = 50 - result.waterMl;
-    const savedCo2ThisTurn = 0.5 - result.co2Grams;
-    setPersonalSavings((prev) => ({ waterMl: prev.waterMl + savedWaterThisTurn, co2Grams: prev.co2Grams + savedCo2ThisTurn }));
-    setCommunitySavings((prev) => ({ waterLiters: prev.waterLiters + (savedWaterThisTurn / 1000), co2Kg: prev.co2Kg + (savedCo2ThisTurn / 1000) }));
+    setPersonalSavings((prev) => ({ waterMl: prev.waterMl + savedWaterThisTurn }));
+    setCommunitySavings((prev) => ({ waterLiters: prev.waterLiters + (savedWaterThisTurn / 1000) }));
     setHasPlayedToday(true);
 
     soundManager.stopScan();
@@ -530,7 +520,7 @@ export default function App() {
         return "○";
       })
       .join("");
-    const text = `PromptShot — ${challenge.id}\n${score.total}/100 ${dots}\n💧 ~10ml · ${challenge.difficulty}`;
+    const text = `PromptShot — ${challenge.id}\n${score.total}/100 ${dots}\n💧 ${score.waterMl}ml · ${challenge.difficulty}`;
     const tryClipboard = async () => {
       try {
         await navigator.clipboard.writeText(text);

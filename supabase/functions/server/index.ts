@@ -69,11 +69,11 @@ function estimateResources(usage?: TokenUsage) {
   const output = usage?.output_tokens ?? 0;
   const total = input + output;
 
-  // Estimating footprints dynamically based on token volume (300 tokens ≈ 10ml water & 0.1g CO2)
+  // Estimating footprints dynamically based on token volume (300 tokens ≈ 10ml water)
   const waterMl = Math.max(1, Math.round(total * 0.033));
-  const co2Grams = Math.max(0.01, parseFloat((total * 0.00033).toFixed(3)));
+  
 
-  return { waterMl, co2Grams };
+  return { waterMl };
 }
 
 async function getChallengeFromDb(challengeId: string | number) {
@@ -86,7 +86,6 @@ async function getChallengeFromDb(challengeId: string | number) {
           target_output: challenge.targetOutput || challenge.target_output,
           ideal_prompt: challenge.idealPrompt || challenge.ideal_prompt,
           ideal_water_ml: challenge.idealWaterMl ?? challenge.ideal_water_ml,
-          ideal_co2_grams: challenge.idealCo2Grams ?? challenge.ideal_co2_grams,
         };
       }
     } catch (err) {
@@ -96,7 +95,7 @@ async function getChallengeFromDb(challengeId: string | number) {
 
   const { data, error } = await supabaseAdmin
     .from("challenges")
-    .select("target_output, ideal_prompt, ideal_water_ml, ideal_co2_grams")
+    .select("target_output, ideal_prompt, ideal_water_ml")
     .eq("id", challengeId)
     .single();
 
@@ -306,14 +305,13 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
   const rawFormat = Math.max(0, Math.min(20, judgeResult.structural_score ?? 0));
 
   if (mappedAccuracy === 0) {
-    const { waterMl, co2Grams } = estimateResources({ input_tokens: sandbox.promptTokens, output_tokens: sandbox.completionTokens });
+    const { waterMl } = estimateResources({ input_tokens: sandbox.promptTokens, output_tokens: sandbox.completionTokens });
     return {
       accuracy: 0,
       format: 0,
       brevity: 0,
       total: 0,
       waterMl,
-      co2Grams,
       justification: `The generated sandbox output is completely irrelevant or senseless. Format and brevity scores are penalized to 0. Detailed reason: ${judgeResult.justification}`,
       feedback: judgeResult.player_feedback,
       sandboxOutput: sandbox.outputText,
@@ -338,7 +336,7 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
   const subTotal = mappedAccuracy + scaledFormat + scaledBrevity;
   const adjustedTotal = Math.min(100, Math.round(subTotal + bonus));
 
-  const { waterMl, co2Grams } = estimateResources({ input_tokens: sandbox.promptTokens, output_tokens: sandbox.completionTokens });
+  const { waterMl } = estimateResources({ input_tokens: sandbox.promptTokens, output_tokens: sandbox.completionTokens });
 
   return {
     accuracy: Math.round(mappedAccuracy),
@@ -346,7 +344,6 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
     brevity: Math.round(scaledBrevity),
     total: adjustedTotal,
     waterMl,
-    co2Grams,
     justification: judgeResult.justification,
     feedback: judgeResult.player_feedback,
     sandboxOutput: sandbox.outputText,
@@ -391,7 +388,6 @@ function fallbackScore(userPrompt: string, targetOutput: string = "", difficulty
       brevity: 0,
       total: 0,
       waterMl: 1,
-      co2Grams: 0.01,
       justification: "Your prompt is too short or generic to execute.",
       feedback: "Try writing a prompt with specific instructions and subject matter."
     };
@@ -433,7 +429,7 @@ function fallbackScore(userPrompt: string, targetOutput: string = "", difficulty
   
   const estTokens = userTokens + Math.round(targetOutput.length / 4);
   const waterMl = Math.max(1, Math.round(estTokens * 0.033));
-  const co2Grams = Math.max(0.01, parseFloat((estTokens * 0.00033).toFixed(3)));
+  
   
   return {
     accuracy: Math.min(50, clarityScore),
@@ -441,7 +437,6 @@ function fallbackScore(userPrompt: string, targetOutput: string = "", difficulty
     brevity: Math.min(30, Math.round(brevityScore * scalingFactor)),
     total,
     waterMl,
-    co2Grams,
     justification: "Busy server fallback grading applied.",
     feedback: hasActionVerb && hasSubject && hasTone
       ? "Strong prompt structure detected — try the live scorer for full AI evaluation."
@@ -469,7 +464,6 @@ app.post("/make-server-488928a2/score", async (c) => {
         brevity: 0,
         total: 0,
         waterMl: 1,
-        co2Grams: 0.01,
         justification: "Your prompt is too short or generic to execute in the sandbox.",
         feedback: "Try writing a prompt with specific instructions and subject matter.",
         idealPrompt: challenge.ideal_prompt,
@@ -489,7 +483,6 @@ app.post("/make-server-488928a2/score", async (c) => {
         idealPrompt: challenge.ideal_prompt,
         sandboxOutput: "[Copy-paste attempt blocked. Describe the output instead of copying it.]",
         waterMl: 1,
-        co2Grams: 0.01,
       });
     }
 
@@ -539,7 +532,6 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
         brevity: 0,
         total: 0,
         waterMl: 1,
-        co2Grams: 0.01,
         justification: "Your prompt is too short or generic to execute in the sandbox.",
         feedback: "Try writing a prompt with specific instructions and subject matter.",
         idealPrompt: challenge.ideal_prompt,
@@ -559,7 +551,6 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
         idealPrompt: challenge.ideal_prompt,
         sandboxOutput: "[Copy-paste attempt blocked. Describe the output instead of copying it.]",
         waterMl: 1,
-        co2Grams: 0.01,
       });
     }
 
@@ -686,7 +677,7 @@ async function validateIdealPrompt(candidate: {
   idealPrompt: string;
   targetOutput: string;
   target_output?: string;
-}): Promise<{ score: number; idealWaterMl: number; idealCo2Grams: number }> {
+}): Promise<{ score: number; idealWaterMl: number }> {
   const targetOutput = candidate.targetOutput ?? candidate.target_output ?? "";
 
   // Step 1: run the idealPrompt through the same execution sandbox
@@ -704,12 +695,12 @@ async function validateIdealPrompt(candidate: {
 
   const total = Math.min(100, semantic + keyword + structure + brevityBonus);
   
-  const { waterMl, co2Grams } = estimateResources({
+  const { waterMl } = estimateResources({
     input_tokens: sandbox.promptTokens,
     output_tokens: sandbox.completionTokens,
   });
 
-  return { score: total, idealWaterMl: waterMl, idealCo2Grams: co2Grams };
+  return { score: total, idealWaterMl: waterMl };
 }
 // ─── static fallback pool ──────────────────────────────────────────────────
 // Two well-tested challenges per difficulty level, targeted at 16–22 year olds.
@@ -728,43 +719,43 @@ const STATIC_FALLBACKS: Record<string, object[]> = {
       id: "b001", difficulty: "BEGINNER",
       targetOutput: "Black holes are regions of space where gravity is so strong that nothing, not even light, can escape. The boundary surrounding a black hole is called the event horizon. Once anything crosses this line, it cannot return.",
       idealPrompt: "Explain what a black hole and its event horizon are in three sentences. Mention that gravity prevents light from escaping.",
-      idealWaterMl: 11, idealCo2Grams: 0.111,
+      idealWaterMl: 11,
     },
     {
       id: "b002", difficulty: "BEGINNER",
       targetOutput: "Hey Priya, I'm so sorry but I have to bail tonight 😞 I've had the worst headache all day and I know I'd be terrible company. Can we reschedule for next weekend? I'll make it up to you!",
       idealPrompt: "Text to Priya canceling tonight, headache, apologize, suggest rescheduling next weekend.",
-      idealWaterMl: 10, idealCo2Grams: 0.105,
+      idealWaterMl: 10,
     },
     {
       id: "b003", difficulty: "BEGINNER",
       targetOutput: "Imagine a clock on a super fast spaceship. To us watching from Earth, that clock ticks slower than ours. This happens because time bends when you travel close to the speed of light. It is called time dilation.",
       idealPrompt: "Explain time dilation on a fast spaceship to a kid. Mention clocks ticking slower and speed of light in 3 sentences.",
-      idealWaterMl: 11, idealCo2Grams: 0.109,
+      idealWaterMl: 11,
     },
     {
       id: "b004", difficulty: "BEGINNER",
       targetOutput: "Edrik Stormweaver, Edrik Valerius, Edrik Blackwood, Edrik Thorn, Edrik Ironwood, Edrik Shadowend, Edrik Dawnrunner, Edrik Frostfield, Edrik Kingslayer, Edrik Wyrmbreaker.",
       idealPrompt: "List exactly 10 fantasy last names starting with capital letters, paired with first name Edrik, separated by commas.",
-      idealWaterMl: 11, idealCo2Grams: 0.106,
+      idealWaterMl: 11,
     },
     {
       id: "b005", difficulty: "BEGINNER",
       targetOutput: "Hey roommates, could we please make sure to wash all pots and pans tonight? The sink is completely full and it's getting hard to prep breakfast in the morning. Thanks for understanding!",
       idealPrompt: "Roommate text politely asking to wash pots and pans tonight because sink is full and morning breakfast prep is hard.",
-      idealWaterMl: 11, idealCo2Grams: 0.107,
+      idealWaterMl: 11,
     },
     {
       id: "b006", difficulty: "BEGINNER",
       targetOutput: "It would still take 30 minutes. All 10 shirts can dry at the same time on the clothesline. Putting more shirts out to dry does not increase the drying time for each individual shirt.",
       idealPrompt: "Answer the riddle: if it takes 30 mins to dry 5 shirts, how long to dry 10? Explain that they dry at the same time.",
-      idealWaterMl: 11, idealCo2Grams: 0.107,
+      idealWaterMl: 11,
     },
     {
       id: "b007", difficulty: "BEGINNER",
       targetOutput: "Baking soda is a natural, non-toxic cleaner. It absorbs tough odors, scrubs away kitchen stains without scratching surfaces, and balances pH levels, making it safe for kids and pets.",
       idealPrompt: "Rewrite dry technical baking soda details into a warm, feature-focused blurb highlighting safety for kids and pets.",
-      idealWaterMl: 11, idealCo2Grams: 0.107,
+      idealWaterMl: 11,
     },
   ],
   PRO: [
@@ -772,43 +763,43 @@ const STATIC_FALLBACKS: Record<string, object[]> = {
       id: "p001", difficulty: "PRO",
       targetOutput: "CUDA is Nvidia's proprietary platform, offering deep integration and maximum performance on Nvidia hardware. OpenCL is an open, cross-platform standard supporting AMD, Intel, and Nvidia chips, but with less optimization. Choose CUDA for Nvidia GPUs, and OpenCL for heterogeneous hardware.",
       idealPrompt: "Compare CUDA and OpenCL programming models. Highlight hardware compatibility and performance, and provide a recommendation. Under 50 words.",
-      idealWaterMl: 12, idealCo2Grams: 0.118,
+      idealWaterMl: 12,
     },
     {
       id: "p002", difficulty: "PRO",
       targetOutput: "Here are 3 ways to monetize a high-end PC:\n1. 3D Rendering & Video Editing: Rent your GPU power on decentralized networks.\n2. Game Server Hosting: Host multiplayer game servers for a small monthly fee.\n3. AI Model Tuning: Run local low-rank adaptation training runs for clients.",
       idealPrompt: "List 3 creative, legal ways a student can earn income using a gaming PC. Use numbered list with bold titles and short descriptions.",
-      idealWaterMl: 12, idealCo2Grams: 0.116,
+      idealWaterMl: 12,
     },
     {
       id: "p003", difficulty: "PRO",
       targetOutput: "```bash\n#!/bin/bash\n# Continually ping Google DNS and log failures\nwhile true; do\n  if ! ping -c 1 8.8.8.8 >/dev/null 2>&1; then\n    echo \"[$(date)] Ping failed!\" >> ping_errors.log\n  fi\n  sleep 5\ndone\n```",
       idealPrompt: "Write a bash script containing a while loop that pings 8.8.8.8. If it fails, log timestamped failure message to ping_errors.log. Sleep 5s.",
-      idealWaterMl: 11, idealCo2Grams: 0.111,
+      idealWaterMl: 11,
     },
     {
       id: "p004", difficulty: "PRO",
       targetOutput: "Public key cryptography is like a mailbox. Anyone can put a letter in through the slot using the public key, which is open to everyone. But only the owner of the mailbox can open it and read the letters using the private key, which is kept secret. This keeps messages safe.",
       idealPrompt: "Explain public key cryptography using a mailbox lock-and-key analogy. Cover how public and private keys operate to secure messages.",
-      idealWaterMl: 12, idealCo2Grams: 0.116,
+      idealWaterMl: 12,
     },
     {
       id: "p005", difficulty: "PRO",
       targetOutput: "```css\n.card {\n  background: rgba(255, 255, 255, 0.1);\n  backdrop-filter: blur(10px);\n  border: 1px solid rgba(255, 255, 255, 0.2);\n  border-radius: 16px;\n  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);\n  padding: 24px;\n  color: #fff;\n}\n```",
       idealPrompt: "Write a clean CSS .card block with glassmorphism (translucent background, blur), white border, rounded corners, drop shadow, and padding.",
-      idealWaterMl: 11, idealCo2Grams: 0.114,
+      idealWaterMl: 11,
     },
     {
       id: "p006", difficulty: "PRO",
       targetOutput: "Hey everyone 👋 For the Airbnb deposit we each owe $47.50 — can everyone Venmo Zara by Wednesday? We need to confirm the booking by Thursday night so please don't leave her hanging. Let me know ASAP if you can't make it work!",
       idealPrompt: "Group chat: 4 people Venmo Zara $47.50 for Airbnb deposit by Wednesday, booking deadline Thursday night, casual but urgent.",
-      idealWaterMl: 11, idealCo2Grams: 0.111,
+      idealWaterMl: 11,
     },
     {
       id: "p007", difficulty: "PRO",
       targetOutput: "Hi Professor Okafor, I'm a sophomore in Intro to Economics. I found your recent talk on decision fatigue fascinating. Do you have any openings for undergraduate research assistants next semester? I would love to learn more and discuss how I could contribute to your project.",
       idealPrompt: "Polite cold email to Professor Okafor: sophomore, loved his decision fatigue talk, ask about undergraduate research assistant openings next semester.",
-      idealWaterMl: 12, idealCo2Grams: 0.117,
+      idealWaterMl: 12,
     },
   ],
   EXPERT: [
@@ -816,43 +807,43 @@ const STATIC_FALLBACKS: Record<string, object[]> = {
       id: "e001", difficulty: "EXPERT",
       targetOutput: "If you love the mind-bending time travel of Dark, check out: 1. Alan Wake 2 (cosmic horror, shifting realities), 2. Outer Wilds (time loop exploration, stellar mystery), and 3. BioShock Infinite (parallel dimensions, rich narrative). All match the dark, mysterious atmosphere you want.",
       idealPrompt: "Recommend 3 video games (with short parenthetical descriptions) for a fan of the TV show Dark, focusing on mystery, time-travel, and dark atmosphere. Under 60 words.",
-      idealWaterMl: 12, idealCo2Grams: 0.119,
+      idealWaterMl: 12,
     },
     {
       id: "e002", difficulty: "EXPERT",
       targetOutput: "Midnights in the kitchen, sweating in my jeans / Underpants are soggy, if you know what I mean / Running through the heatwave, crying in the park / These damp cotton fabrics leaving their wet mark / Oh, it's a cruel summer, but my drawers are cold and wet.",
       idealPrompt: "Write Swift-style song lyrics about soggy/sweaty underpants during a hot summer. Incorporate dramatic Midnights/Cruel Summer themes. Under 55 words.",
-      idealWaterMl: 12, idealCo2Grams: 0.116,
+      idealWaterMl: 12,
     },
     {
       id: "e003", difficulty: "EXPERT",
       targetOutput: "L2 regularization prevents overfitting by adding a penalty proportional to the square of weight magnitudes to the loss function. This discourages weights from growing excessively large, smoothing the model's decision boundaries and ensuring it doesn't overfit to training noise.",
       idealPrompt: "Explain how L2 regularization prevents machine learning overfitting. Focus on the penalty term, weight magnitudes, and decision boundary smoothing. Keep it precise and technical.",
-      idealWaterMl: 12, idealCo2Grams: 0.12,
+      idealWaterMl: 12,
     },
     {
       id: "e004", difficulty: "EXPERT",
       targetOutput: "```python\ndef get_primes(numbers):\n    # Filter and return list of prime numbers\n    def is_prime(n):\n        if n < 2: return False\n        for i in range(2, int(n**0.5) + 1):\n            if n % i == 0: return False\n        return True\n    return [num for num in numbers if is_prime(num)]\n```",
       idealPrompt: "Write a Python function get_primes(numbers) that filters a list for primes. Include a helper function is_prime, use square root limit for efficiency, and add a single comment.",
-      idealWaterMl: 12, idealCo2Grams: 0.121,
+      idealWaterMl: 121,
     },
     {
       id: "e005", difficulty: "EXPERT",
       targetOutput: "Dear Landlord, I am writing to report that the bathroom sink has been leaking since last week. Water is starting to pool and damage the cabinet beneath. Please send maintenance to fix this as soon as possible to prevent further water damage. Thank you for your prompt attention.",
       idealPrompt: "Polite but urgent maintenance request to landlord: bathroom sink leaking since last week, water pooling and cabinet damage, ask for quick fix to prevent further damage.",
-      idealWaterMl: 12, idealCo2Grams: 0.119,
+      idealWaterMl: 12,
     },
     {
       id: "e006", difficulty: "EXPERT",
       targetOutput: "The soup is ice. Even though the refrigeration truck is at 0 degrees, the soup starts warm or liquid, and over time in a sealed box with ice, the system reaches thermal equilibrium. Since 0°C is the freezing point of water, the soup will eventually freeze solid, and the ice remains.",
       idealPrompt: "Solve this riddle: a warm bowl of soup and ice cube are put in a box in a 0°C truck. What happens to the soup and ice? Explain thermal equilibrium and freezing point.",
-      idealWaterMl: 12, idealCo2Grams: 0.12,
+      idealWaterMl: 12,
     },
     {
       id: "e007", difficulty: "EXPERT",
       targetOutput: "The Rosetta Stone, discovered in 1799 by French soldiers in Egypt, is a granodiorite stele inscribed with three scripts: Hieroglyphic, Demotic, and Ancient Greek. This trilingual decree allowed scholars like Champollion to decode Egyptian hieroglyphs by comparing them to the Greek text.",
       idealPrompt: "Explain how the Rosetta Stone was discovered and used to decode hieroglyphs. Mention the three scripts, the year of discovery, and Champollion's contribution. Under 55 words.",
-      idealWaterMl: 12, idealCo2Grams: 0.121,
+      idealWaterMl: 121,
     },
   ]
 };
@@ -878,7 +869,6 @@ const STATIC_FALLBACKS: Record<string, object[]> = {
       target_output: picked.targetOutput,
       ideal_prompt: picked.idealPrompt,
       ideal_water_ml: picked.idealWaterMl,
-      ideal_co2_grams: picked.idealCo2Grams,
       char_count: picked.targetOutput.length,
       charCount: picked.targetOutput.length,
       active: true,
@@ -927,8 +917,6 @@ async function generateValidatedChallenge(difficulty: string): Promise<object> {
         validationScore: validationResult.score,
         idealWaterMl: validationResult.idealWaterMl,
         ideal_water_ml: validationResult.idealWaterMl,
-        idealCo2Grams: validationResult.idealCo2Grams,
-        ideal_co2_grams: validationResult.idealCo2Grams,
       };
     }
 

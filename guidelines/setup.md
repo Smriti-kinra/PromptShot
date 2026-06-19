@@ -29,7 +29,6 @@ The application uses a hybrid scoring pipeline. For authenticated or guest runs,
     brevity: number;    // 0–30 (Token + Latency, scaled by accuracy)
     total: number;      // sum of above (0-100)
     waterMl: number;    // Estimated server water footprint
-    co2Grams: number;   // Estimated server carbon footprint
     idealPrompt?: string;
     justification?: string;
     feedback?: string;

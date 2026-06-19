@@ -48,7 +48,6 @@ Once scored, the client displays a comprehensive performance card via [ResultsSc
    │                                                        │
    │  [Environmental Impact Explainer] ──► Teal (#0EA79A)   │
    │  - Water Evaporated: 11ml                              │
-   │  - Carbon Emitted: 0.12g                               │
    └────────────────────────────────────────────────────────┘
 ```
 
@@ -64,7 +63,7 @@ PromptShot tracks and renders the resource footprint of LLM queries using HSL-mi
 
 * **Water Glass Visualizer**: Implemented in [WaterGlass.tsx](file:///Users/smriti/Documents/GitHub/promptshot/src/components/WaterGlass.tsx). Renders an animated SVG water glass that dynamically fills or empties, illustrating the exact milliliters of cooling water evaporated by the query.
 * **Ecological Stats Cards**: Evaluated via [estimateResources](file:///Users/smriti/Documents/GitHub/promptshot/supabase/functions/server/index.ts#L67) and rendered in [ImpactRow.tsx](file:///Users/smriti/Documents/GitHub/promptshot/src/components/impact/ImpactRow.tsx). Shows comparison percentages against the daily benchmark footprint.
-* **Impact Detail Modals**: Created via [ImpactExplainerModal.tsx](file:///Users/smriti/Documents/GitHub/promptshot/src/components/impact/ImpactExplainerModal.tsx) to provide scientific citations explaining how carbon and water footprints correlate directly with token calculations.
+* **Impact Detail Modals**: Created via [ImpactExplainerModal.tsx](file:///Users/smriti/Documents/GitHub/promptshot/src/components/impact/ImpactExplainerModal.tsx) to provide scientific citations explaining how water footprints correlate directly with token calculations.
 
 ---
 

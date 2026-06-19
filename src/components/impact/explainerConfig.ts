@@ -1,4 +1,4 @@
-export type ExplainerType = "water" | "co2" | "lifetime-water" | "lifetime-co2" | "community-water" | "community-co2";
+export type ExplainerType = "water" | "lifetime-water" | "community-water";
 
 export interface ExplainerConfig {
   title: string;
@@ -10,9 +10,9 @@ export interface ExplainerConfig {
 
 export function getExplainerConfig(
   type: ExplainerType,
-  score?: { waterMl: number; co2Grams: number },
-  personal?: { waterMl: number; co2Grams: number },
-  community?: { waterLiters: number; co2Kg: number },
+  score?: { waterMl: number },
+  personal?: { waterMl: number },
+  community?: { waterLiters: number },
 ): ExplainerConfig {
   const configs: Record<ExplainerType, ExplainerConfig> = {
     water: {
@@ -37,29 +37,6 @@ export function getExplainerConfig(
         },
       ],
       source: 'Li et al., "Making AI Less Thirsty: Uncovering and Addressing the Secret Water Footprint of AI Models," UC Riverside (2023). arXiv:2304.03271',
-    },
-    co2: {
-      title: "How CO₂ is calculated",
-      emoji: "🌲",
-      color: "var(--ps-teal)",
-      steps: [
-        {
-          label: "Count tokens processed",
-          formula: "Input tokens + Output tokens = total tokens",
-          note: "Sourced from Claude API usage metadata",
-        },
-        {
-          label: "Apply carbon intensity factor",
-          formula: `total_tokens × 0.00033 g/token ≈ ${score?.co2Grams?.toFixed(2) ?? "—"}g CO₂`,
-          note: "Derived from average US data center PUE of 1.5 and average grid carbon intensity of ~0.45 kg CO₂/kWh",
-        },
-        {
-          label: "Result",
-          formula: `~${score?.co2Grams?.toFixed(2) ?? "—"}g of CO₂ emitted`,
-          note: "This is equivalent to driving a car approximately 0.001km — small per query, significant at scale",
-        },
-      ],
-      source: "Patterson et al., \"Carbon Emissions and Large Neural Network Training,\" Google & UC Berkeley (2021). IEA Data Center Energy Efficiency (2023).",
     },
     "lifetime-water": {
       title: "Your lifetime water savings",
@@ -88,31 +65,6 @@ export function getExplainerConfig(
       ],
       source: 'Li et al., "Making AI Less Thirsty," UC Riverside (2023). Baseline derived from industry average multi-turn session analysis.',
     },
-    "lifetime-co2": {
-      title: "Your lifetime CO₂ savings",
-      emoji: "🌲",
-      color: "var(--ps-teal)",
-      steps: [
-        {
-          label: "Baseline CO₂ per 5-turn session",
-          formula: "~0.5g CO₂ (5 × 0.1g per query average)",
-        },
-        {
-          label: "Your actual CO₂",
-          formula: "Measured from your token counts via Claude API",
-        },
-        {
-          label: "Savings formula",
-          formula: "0.5g − actual_co2 = co2_saved per game",
-        },
-        {
-          label: "Your total",
-          formula: `~${personal?.co2Grams?.toFixed(2) ?? "0"}g CO₂ prevented`,
-          note: "Equivalent to approximately 0.1m of car travel not taken",
-        },
-      ],
-      source: "Patterson et al., Carbon Emissions and Large Neural Network Training (2021). IEA Data Center Energy Efficiency (2023).",
-    },
     "community-water": {
       title: "Community water savings",
       emoji: "💧",
@@ -135,28 +87,6 @@ export function getExplainerConfig(
         },
       ],
       source: 'Li et al., "Making AI Less Thirsty," UC Riverside (2023). Community data from live Supabase scores table.',
-    },
-    "community-co2": {
-      title: "Community CO₂ savings",
-      emoji: "🌲",
-      color: "var(--ps-teal)",
-      steps: [
-        {
-          label: "Seed baseline",
-          formula: "124.5kg starting value",
-          note: "Equivalent to ~500km of car travel",
-        },
-        {
-          label: "Live tracking",
-          formula: "Each game adds: 0.5g − player's actual CO₂",
-          note: "Pulled from the Supabase scores table",
-        },
-        {
-          label: "Community total",
-          formula: `~${community?.co2Kg?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? "—"}kg CO₂ prevented`,
-        },
-      ],
-      source: "Patterson et al., Carbon Emissions and Large Neural Network Training (2021).",
     },
   };
   return configs[type];

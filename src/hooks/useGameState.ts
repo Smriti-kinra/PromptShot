@@ -17,7 +17,6 @@ export interface LocalScore {
   challenge_id?: string;
   user_prompt?: string;
   waterMl?: number;
-  co2Grams?: number;
 }
 
 export type GameState = "challenge" | "loading" | "results" | "impact" | "already-played";
@@ -81,7 +80,6 @@ export function useGameState() {
       user_prompt: s.user_prompt ?? "",
       played_at: s.played_at,
       water_ml: s.waterMl ?? 10,
-      co2_grams: s.co2Grams ?? 0.1,
     }));
 
     await supabase.from("scores").upsert(rows, { onConflict: "user_id,played_at" });

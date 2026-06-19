@@ -44,7 +44,6 @@ The edge function returns a structured JSON payload:
   "brevity": 24,
   "total": 87,
   "waterMl": 10,
-  "co2Grams": 0.1,
   "justification": "Text matched meaning perfectly but omitted one minor structural layout.",
   "feedback": "Try adding explicit lists instruction in your prompt to capture structure.",
   "sandboxOutput": "Polished text result.",

@@ -8,8 +8,8 @@ import { AdmireScreen } from "./AdmireScreen";
 interface AlreadyPlayedProps {
   score: ScoreResult | null;
   challenge: Challenge | null;
-  personalSavings: { waterMl: number; co2Grams: number };
-  communitySavings: { waterLiters: number; co2Kg: number };
+  personalSavings: { waterMl: number };
+  communitySavings: { waterLiters: number };
   userPrompt?: string;
   idealPrompt?: string;
   onShare: () => void;
@@ -19,7 +19,7 @@ interface AlreadyPlayedProps {
 // AdmireSplash replaced by `AdmireScreen` component (see src/screens/AdmireScreen.tsx)
 
 function AdmireStats({ score, challenge, personalSavings, communitySavings, userPrompt, idealPrompt, onShare, onBackToMenu }: AlreadyPlayedProps) {
-  const defaultScore = score ?? { accuracy: 0, format: 0, brevity: 0, total: 0, waterMl: 0, co2Grams: 0 };
+  const defaultScore = score ?? { accuracy: 0, format: 0, brevity: 0, total: 0, waterMl: 0,  };
   return (
     <div className="ps-centered-panel" style={{ borderRadius: "14px", border: "4px solid var(--ps-teal)", background: "rgba(14,167,154,0.06)" }}>
       <ResultsScreen

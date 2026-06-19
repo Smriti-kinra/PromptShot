@@ -11,7 +11,6 @@ Rendered in 'impact' game state only. Appears automatically, not on user click.
 interface ImpactCardProps {
   apiCallsUsed: number;      // always 1 for v1
   waterMl: number;           // 10 per call
-  co2Grams: number;          // 0.1 per call
   totalScore: number;        // determines if low-score warning shows
   visible: boolean;          // controls slide-up animation
 }
@@ -22,7 +21,7 @@ interface ImpactCardProps {
 [teal-dim bg — rgba(20,184,166,0.12)]
 [16px radius, 24px padding]
 Row 1: "This prompt used" [N] "API call" — [N] in teal
-Row 2: "≈ Xml water  ·  ≈ Xg CO₂" — X values in teal
+Row 2: "≈ Xml water" — X values in teal
 [If totalScore < 60, show this block separated by a 1px border:]
 Row 3: "A score this low typically means 3+ follow-ups to reach this output"
 Row 4: "That's ≈ 30ml more — roughly a tablespoon" — "a tablespoon" in amber
@@ -47,7 +46,7 @@ Trigger when `visible` prop changes to true.
 - 100ml: "a quarter cup"
 
 ## Rules
-- NEVER use amber for water/CO₂ values — only teal
+- NEVER use amber for water values — only teal
 - The one exception: "a tablespoon" comparison text uses amber (it's a callout)
 - Do NOT add a close button or dismiss interaction
 - Do NOT change the copy — these strings are final

@@ -20,7 +20,6 @@ export interface Challenge {
   target_output: string;
   ideal_prompt?: string;
   ideal_water_ml?: number;   // NEW
-  ideal_co2_grams?: number;  // NEW
   char_count: number;
   active: boolean;
   skill?: string;

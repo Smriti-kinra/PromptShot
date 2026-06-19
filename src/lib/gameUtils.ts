@@ -46,7 +46,6 @@ export function getLocalFallbackChallenge(difficulty: string): Challenge {
     target_output: localCh.targetOutput,
     ideal_prompt: localCh.idealPrompt,
     ideal_water_ml: localCh.idealWaterMl,   // NEW
-    ideal_co2_grams: localCh.idealCo2Grams, // NEW
     char_count: localCh.charCount,
     active: true,
   };
@@ -78,7 +77,6 @@ export async function loadChallenge(
       target_output: data.targetOutput || data.target_output,
       ideal_prompt: data.idealPrompt || data.ideal_prompt,
       ideal_water_ml: data.idealWaterMl ?? data.ideal_water_ml,   // NEW
-      ideal_co2_grams: data.idealCo2Grams ?? data.ideal_co2_grams, // NEW
       char_count: data.charCount || data.char_count,
       active: data.active,
     };
