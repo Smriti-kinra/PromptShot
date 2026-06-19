@@ -60,13 +60,13 @@ function getScoreFeedback(
     if (accPct < 50)
       return {
         dim: "Accuracy",
-        label: "Critical: Meaning missed",
+        label: "REVIEW: Meaning missed",
         tip: 'Your prompt didn\'t capture the core content. Add an explicit task verb (e.g. "Write", "List", "Explain") and name the specific subject the output must cover.',
       };
     if (accPct < 75)
       return {
         dim: "Accuracy",
-        label: "Tip: Add missing details",
+        label: "REVIEW: Add missing details",
         tip: "Your prompt got the gist but lost important nuances. Specify the key details, constraints, or examples that the target output depends on.",
       };
   }
@@ -75,13 +75,13 @@ function getScoreFeedback(
     if (fmtPct < 50)
       return {
         dim: "Format",
-        label: "Critical: No structure specified",
+        label: "REVIEW: No structure specified",
         tip: 'Your prompt gave no formatting instructions. Tell the AI the exact output shape — e.g. "as a numbered list", "in a markdown table", "in 3 sentences", or "as a JSON object".',
       };
     if (fmtPct < 75)
       return {
         dim: "Format",
-        label: "Tip: Tighten your format constraints",
+        label: "REVIEW: Tighten your format constraints",
         tip: "Your prompt hinted at structure but wasn't precise enough. Specify length limits, required section order, or explicit output types to lock in the shape.",
       };
   }
@@ -90,20 +90,20 @@ function getScoreFeedback(
     if (brePct < 50)
       return {
         dim: "Brevity",
-        label: "Tip: Your prompt is too long/inefficient",
+        label: "REVIEW: Your prompt is too long/inefficient",
         tip: "Remove background context the AI already knows, cut filler phrases, and consolidate overlapping constraints. Every unnecessary word increases compute cost.",
       };
     if (brePct < 75)
       return {
         dim: "Brevity",
-        label: "Tip: Trim further",
+        label: "REVIEW: Trim further",
         tip: 'You\'re close. Replace multi-word explanations with single precise terms — e.g. "formal tone" instead of "make it sound professional and business-like".',
       };
   }
 
   return {
     dim: "All",
-    label: "Well-crafted prompt",
+    label: "REVIEW: Well-crafted prompt",
     tip: "Strong across all three dimensions. Your prompt was clear, structured, and efficient — exactly what one-shot prompting looks like.",
   };
 }
@@ -130,7 +130,6 @@ export function ResultsScreen({
     { label: "Brevity", value: score.brevity, max: 30, tooltip: SCORE_BAR_TOOLTIPS.Brevity, r: 35 },
   ];
   const [playRings, setPlayRings] = useState(false);
-  const [didYouKnowOpen, setDidYouKnowOpen] = useState(false);
 
   const diffTokens = userPrompt && idealPrompt ? computeWordDiff(userPrompt, idealPrompt) : [];
   const hasRemovals = diffTokens.some((t) => t.type === "removed");
@@ -230,142 +229,94 @@ export function ResultsScreen({
 
       {/* ── Impact card ── */}
       <AnimatePresence>
-        {gameState === "impact" && (
-          <motion.div
-            key="impact-card"
-            initial={{ opacity: 0, y: 24, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.98 }}
-            whileHover={!didYouKnowOpen ? {
-              scale: 1.015,
-              y: -2,
-              backgroundColor: "rgba(20, 184, 166, 0.08)",
-              borderColor: "rgba(20, 184, 166, 0.35)",
-              boxShadow: "0 12px 32px 0 rgba(0, 0, 0, 0.45), 0 0 20px rgba(20, 184, 166, 0.15)",
-            } : {}}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="ps-glass-panel"
-            onClick={() => {
-              if (!didYouKnowOpen) {
-                setDidYouKnowOpen(true);
-              }
-            }}
-            style={{
-              background: "rgba(20, 184, 166, 0.04)",
-              borderLeft: "4px solid var(--ps-teal)",
-              borderColor: "rgba(20, 184, 166, 0.15)",
-              padding: "24px",
-              marginBottom: "24px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-              cursor: !didYouKnowOpen ? "pointer" : "default",
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDidYouKnowOpen(d => !d);
-                }}
-              >
+        {gameState === "impact" && (() => {
+          const idealWaterMl = challenge?.ideal_water_ml;
+          const diff = idealWaterMl != null ? score.waterMl - idealWaterMl : null;
+          const saved = diff != null ? Math.abs(diff) : null;
+          const isOver = diff != null && diff > 0;
+          const isEqual = diff != null && diff === 0;
+
+          const diffText = diff == null
+            ? null
+            : diff === 0
+              ? "Your prompt used the same amount of water as the reference prompt."
+              : diff > 0
+                ? `Your prompt and the model's response together used more tokens than the reference — ${Math.abs(diff)}ml more water, mostly from extra prompt length or a longer generated reply.`
+                : `Your prompt was more token-efficient than the reference prompt, using ${Math.abs(diff)}ml less water.`;
+
+          return (
+            <motion.div
+              key="impact-card"
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -12, scale: 0.98 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="ps-glass-panel"
+              style={{
+                background: "rgba(20, 184, 166, 0.04)",
+                borderLeft: "4px solid var(--ps-teal)",
+                borderColor: "rgba(20, 184, 166, 0.15)",
+                padding: "24px",
+                marginBottom: "24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 <div style={{ fontFamily: "var(--ps-font-ui)", fontSize: "18px", fontWeight: 700, color: "var(--ps-teal)", letterSpacing: "0.02em" }}>
                   Did you know? 🌍
                 </div>
-                <span style={{
-                  color: "var(--ps-text-secondary)", fontSize: "13px",
-                  display: "inline-block",
-                  transform: didYouKnowOpen ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
-                }}>▾</span>
-              </div>
 
-              <AnimatePresence>
-                {didYouKnowOpen && (
-                  <motion.div
-                    key="dyk-body"
-                    initial={{ opacity: 0, height: 0, y: -8 }}
-                    animate={{ opacity: 1, height: "auto", y: 0 }}
-                    exit={{ opacity: 0, height: 0, y: -8 }}
-                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                    style={{ overflow: "hidden" }}
-                  >
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
-                      {idealPrompt ? (() => {
-                        const targetOutput = challenge?.target_output || (challenge as any)?.targetOutput || "";
-                        const isFallback = score.justification?.toLowerCase().includes("fallback") || score.justification?.toLowerCase().includes("simulation");
-                        const idealEstTokens = isFallback
-                          ? Math.round(idealPrompt.length / 4) + 100
-                          : 300 + Math.round(idealPrompt.length / 4) + Math.round(targetOutput.length / 4);
-                        const idealWaterMl = Math.max(1, Math.round(idealEstTokens * 0.033));
-
-                        const diff = score.waterMl - idealWaterMl;
-                        const saved = Math.abs(diff);
-                        const isOver  = diff > 0;
-                        const isEqual = diff === 0;
-
-                        let diffReason = "";
-                        if (score.total >= 95) {
-                          diffReason = `Your prompt performed on par with the ideal benchmark, matching its efficiency and accuracy with ${score.waterMl}ml of water.`;
-                        } else {
-                          const accLost = 50 - score.accuracy;
-                          const fmtLost = 20 - score.format;
-                          const breLost = 30 - score.brevity;
-
-                          if (breLost >= accLost && breLost >= fmtLost) {
-                            if (isOver) {
-                              diffReason = `While the ideal prompt was highly concise, your prompt was longer and less token-efficient (Brevity: 30/30 vs. ${score.brevity}/30), using ${saved}ml more water.`;
-                            } else {
-                              diffReason = `While the ideal prompt was highly concise, your prompt used fewer tokens to process, saving ${saved}ml of water but scoring lower on overall brevity (Brevity: 30/30 vs. ${score.brevity}/30).`;
-                            }
-                          } else if (accLost >= fmtLost) {
-                            diffReason = `While the ideal prompt captured all semantic details in one shot, your prompt was less precise (Accuracy: 50/50 vs. ${score.accuracy}/50), meaning you would need multiple follow-up prompts to reach the target.`;
-                          } else {
-                            diffReason = `While the ideal prompt perfectly locked in the output shape, your prompt was less structurally precise (Format: 20/20 vs. ${score.format}/20), which requires formatting retries.`;
-                          }
-                        }
-
-                        return (
-                          <>
-                            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "32px", background: "rgba(255,255,255,0.03)", padding: "16px 12px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                                <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>Ideal</div>
-                                <WaterGlass waterMl={idealWaterMl} />
-                                <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{idealWaterMl}ml</div>
-                              </div>
-                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: "20px", gap: 4 }}>
-                                <div style={{ fontSize: "18px", color: isEqual ? "var(--ps-teal)" : isOver ? "var(--ps-amber)" : "var(--ps-teal)" }}>
-                                  {isEqual ? "=" : isOver ? "↑" : "↓"}
-                                </div>
-                                <div style={{ fontSize: "11px", color: isEqual ? "var(--ps-teal)" : isOver ? "var(--ps-amber)" : "var(--ps-teal)", fontFamily: "var(--ps-font-mono)", fontWeight: 700 }}>
-                                  {isEqual ? "same" : `${isOver ? "+" : "-"}${saved}ml`}
-                                </div>
-                              </div>
-                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                                <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>You</div>
-                                <WaterGlass waterMl={score.waterMl} />
-                                <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{score.waterMl}ml</div>
-                              </div>
-                            </div>
-                            <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", lineHeight: "1.55", padding: "0 2px" }}>
-                              {diffReason}
-                            </div>
-                          </>
-                        );
-                      })() : (
-                        <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)" }}>No ideal prompt available for this challenge.</div>
-                      )}
-                      <div style={{ fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontStyle: "italic" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
+                  {idealWaterMl != null ? (
+                    <>
+                      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "32px", background: "rgba(255,255,255,0.03)", padding: "16px 12px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                          <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>Ideal</div>
+                          <WaterGlass waterMl={idealWaterMl} />
+                          <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{idealWaterMl}ml</div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: "20px", gap: 4 }}>
+                          <div style={{ fontSize: "18px", color: "var(--ps-teal)" }}>
+                            {isEqual ? "=" : isOver ? "↑" : "↓"}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "var(--ps-teal)", fontFamily: "var(--ps-font-mono)", fontWeight: 700 }}>
+                            {isEqual ? "same" : `${isOver ? "+" : "-"}${saved}ml`}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                          <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>You</div>
+                          <WaterGlass waterMl={score.waterMl} />
+                          <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{score.waterMl}ml</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", lineHeight: "1.55", padding: "0 2px" }}>
+                        {diffText}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "center", background: "rgba(255,255,255,0.03)", padding: "16px 12px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                          <div style={{ fontSize: "11px", color: "var(--ps-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>You</div>
+                          <WaterGlass waterMl={score.waterMl} />
+                          <div style={{ fontSize: "13px", color: "var(--ps-teal)", fontWeight: 700, fontFamily: "var(--ps-font-mono)" }}>~{score.waterMl}ml</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--ps-text-secondary)", lineHeight: "1.55", padding: "0 2px" }}>
                         Better prompts = less AI = less water.
                       </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
+                    </>
+                  )}
+                  <div style={{ fontSize: "var(--ps-text-caption)", color: "var(--ps-text-secondary)", fontStyle: "italic" }}>
+                    Better prompts = less AI = less water.
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* ── Challenge question ── */}
@@ -379,28 +330,6 @@ export function ResultsScreen({
           </div>
         </motion.div>
       )}
-
-      {/* ── Per-dimension coaching feedback ── */}
-      {!isIdeal && (() => {
-        const fb = getScoreFeedback(score.accuracy, score.format, score.brevity);
-        const allGood = fb.dim === "All";
-        const accentColor = allGood ? "var(--ps-teal)" : "var(--ps-amber)";
-        const borderColor = allGood ? "var(--ps-teal)" : "var(--ps-amber)";
-        return (
-          <motion.div
-            {...fadeUp(0.32)}
-            className={allGood ? "ps-glass-panel" : "ps-glass-panel-amber"}
-            style={{ borderLeft: `4px solid ${borderColor}`, padding: "16px 20px", marginBottom: "24px", borderRadius: "12px" }}
-          >
-            <div style={{ fontSize: "var(--ps-text-caption)", fontWeight: 700, color: accentColor, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>
-              {allGood ? "✓" : "→"} {fb.label}
-            </div>
-            <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)", lineHeight: "1.55" }}>
-              {fb.tip}
-            </div>
-          </motion.div>
-        );
-      })()}
 
       {/* ── Ideal prompt reveal ── */}
       <AnimatePresence>
@@ -434,6 +363,38 @@ export function ResultsScreen({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Per-dimension coaching feedback ── */}
+      {!isIdeal && (() => {
+        const fb = getScoreFeedback(score.accuracy, score.format, score.brevity);
+        const allGood = fb.dim === "All";
+        const accentColor = allGood ? "var(--ps-teal)" : "var(--ps-amber)";
+        const borderColor = allGood ? "var(--ps-teal)" : "var(--ps-amber)";
+        return (
+          <motion.div
+            {...fadeUp(0.32)}
+            className={allGood ? "ps-glass-panel" : "ps-glass-panel-amber"}
+            style={{ borderLeft: `4px solid ${borderColor}`, padding: "16px 20px", marginBottom: "24px", borderRadius: "12px" }}
+          >
+            <div style={{ fontSize: "var(--ps-text-caption)", fontWeight: 700, color: accentColor, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)" }}>
+              {allGood ? "✓" : "→"} {fb.label}
+            </div>
+            <div style={{ fontSize: "13px", color: "var(--ps-text-secondary)", lineHeight: "1.55" }}>
+              {fb.tip}
+            </div>
+            {score.sandboxOutput && (
+              <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--ps-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--ps-font-mono)", marginBottom: "4px" }}>
+                  Output produced by your prompt:
+                </div>
+                <div style={{ background: "#141414", borderLeft: `2px solid ${accentColor}`, borderRadius: "4px", padding: "8px 12px", fontFamily: "var(--ps-font-mono)", fontSize: "13px", color: "var(--ps-text-primary)", whiteSpace: "pre-wrap", textAlign: "left" }}>
+                  {score.sandboxOutput}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        );
+      })()}
 
       {/* ── Action buttons ── */}
       <motion.div {...fadeUp(0.4)} style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", marginTop: "16px" }}>

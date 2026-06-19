@@ -11,10 +11,16 @@ Below is a complete implementation using the PromptShot Solver SDK, configured t
 ```python
 import asyncio
 import aiohttp
+import os
 from promptshot_sdk import Agent, LocalAgentConfig, ToolContext
 
 # Define configuration constants
 SUPABASE_FUNCTIONS_URL = "https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2"
+# Default public anon key mapped in utils/supabase/info.tsx
+SUPABASE_ANON_KEY = os.environ.get(
+    "SUPABASE_ANON_KEY",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2dGFvZXVucWVxbnVvdHlkcnR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwODM5OTcsImV4cCI6MjA5NjY1OTk5N30.ijjmRCE4GkZcu6h5y2xfBWZ4DunEM1jAMXqRIk68-Mk"
+)
 
 # ---------------------------------------------------------
 # Custom Tools for the Solver Agent
@@ -26,13 +32,13 @@ async def get_challenge_details(difficulty: str) -> dict:
     Args:
         difficulty: The level of the challenge, e.g., 'BEGINNER', 'PRO', or 'EXPERT'.
     """
-    # In a real environment, this makes an API request to /challenge?difficulty={difficulty}
+    # Returns the beginner physics challenge details from the static challenges pool
     return {
-        "id": "ai_daily_1",
+        "id": "b001",
         "target_output": (
-            "Hi Dave, thanks for the invite. Since my calendar is fully booked this week, "
-            "could you send over the key questions or agenda via Slack/email? I'll review "
-            "them and reply asynchronously by end of day today so we can save time."
+            "Black holes are regions of space where gravity is so strong that nothing, "
+            "not even light, can escape. The boundary surrounding a black hole is called "
+            "the event horizon. Once anything crosses this line, it cannot return."
         )
     }
 
@@ -50,10 +56,15 @@ async def submit_prompt_attempt(challenge_id: str, user_prompt: str, difficulty:
         "userPrompt": user_prompt,
         "difficulty": difficulty
     }
+    headers = {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": f"Bearer {SUPABASE_ANON_KEY}"
+    }
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
+            async with session.post(url, json=payload, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
                     # Store history in agent context state
@@ -80,7 +91,7 @@ async def submit_prompt_attempt(challenge_id: str, user_prompt: str, difficulty:
 async def main():
     # Setup configuration with Gemini and register tools
     config = LocalAgentConfig(
-        model="gemini-3.5-flash",
+        model="gemini-2.5-flash",
         tools=[get_challenge_details, submit_prompt_attempt],
         system_instructions=(
             "You are an expert Prompt Engineer and an autonomous PromptShot solver agent. "

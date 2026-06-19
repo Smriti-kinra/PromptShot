@@ -6,7 +6,7 @@ The LLM Judge represents Step 2 of the PromptShot evaluation pipeline. It compar
 
 ## 1. Grading Environment
 
-* **Model**: Claude 3.5 Haiku (`claude-3-5-haiku-20241022`)
+* **Model**: Gemini 2.5 Flash (`gemini-2.5-flash`)
 * **Temperature**: `0.0` (critical for consistent, objective grading)
 
 ---
@@ -17,7 +17,7 @@ The LLM Judge represents Step 2 of the PromptShot evaluation pipeline. It compar
 | :--- | :--- | :--- |
 | **Semantic Similarity** | 40 | Evaluates whether the generated text conveys the exact same meaning, facts, and intent as the target (excluding verbatim keywords). |
 | **Structural Match** | 20 | Checks if the output matches the layout (bullet points, markdown tables, paragraphs, code blocks). |
-| **Specificity Match** | 10 | Verifies if specific mandatory terms, functions, proper nouns, or unique numbers are present verbatim. |
+| **Constraint Coverage** | 10 | Verifies if critical facts, variables, names, or deadlines that differentiate the target are present in any form (verbatim or paraphrased). |
 
 ---
 
@@ -48,10 +48,10 @@ Evaluate across three criteria:
    - 1-9: Wrong format category entirely (e.g., prose where the target is a list or code block, or vice versa), even if the content is related.
    - 0: No discernible structure, or structure is entirely unrelated to the target.
 
-3. Specificity Match (0–10): Does the output contain the SPECIFIC identifiers, numbers, proper nouns, or technical terms that make this target unique (e.g. "invoice #1042", "15% of the staff", "end of day today", "by Friday", "debug day")? A close synonym or paraphrase does NOT count — only verbatim matches. General topic words present in both (e.g. "calendar", "meeting", "email") score 0 here.
-   - 9–10: Nearly all unique identifiers present.
+3. Constraint Coverage (0–10): Does the player's generated output cover the CRITICAL FACTS that differentiate this target from a generic version of the same task? (e.g. if the target mentions a specific name, number, deadline, or unique phrase — did the generated output acknowledge those critical details in any form, verbatim OR paraphrased?)
+   - 9–10: All critical specifics present in any form.
    - 4–8:  Roughly half present.
-   - 0–3:  Few or none present.
+   - 0–3:  Most critical specifics missing or invented.
 
 CRITICAL EXECUTION RULES:
 - If the player's generated text is completely unrelated to the target text, is absurd, refuses the task, is empty/near-empty, or has zero contextual overlap, you MUST award exactly 0 points across all three criteria (Semantic Similarity = 0, Structural Match = 0, Specificity Match = 0).
@@ -64,7 +64,7 @@ Expected JSON Schema Output:
 {
   "semantic_score": <integer, 0-40>,
   "structural_score": <integer, 0-20>,
-  "specificity_score": <integer, 0-10>,
+  "specificity_score": <integer, 0-10, for Constraint Coverage>,
   "accuracy_subtotal": <integer, 0-70, sum of the three scores above>,
   "justification": "<string, a direct 1-2 sentence technical explanation citing SPECIFIC mismatches or matches that justify the scores>",
   "player_feedback": "<string, a friendly, encouraging 1-sentence tip on how they could tweak their prompting strategy next time to hit the target more precisely>"

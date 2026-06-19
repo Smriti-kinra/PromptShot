@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite"
+    "dev": "vite",
+    "server": "deno run --allow-net --allow-env --allow-read --watch supabase/functions/server/index.ts",
+    "reset-db": "deno run --allow-net --allow-env utils/clear_db.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",

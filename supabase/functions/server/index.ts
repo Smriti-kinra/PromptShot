@@ -85,6 +85,8 @@ async function getChallengeFromDb(challengeId: string | number) {
         return {
           target_output: challenge.targetOutput || challenge.target_output,
           ideal_prompt: challenge.idealPrompt || challenge.ideal_prompt,
+          ideal_water_ml: challenge.idealWaterMl ?? challenge.ideal_water_ml,
+          ideal_co2_grams: challenge.idealCo2Grams ?? challenge.ideal_co2_grams,
         };
       }
     } catch (err) {
@@ -94,7 +96,7 @@ async function getChallengeFromDb(challengeId: string | number) {
 
   const { data, error } = await supabaseAdmin
     .from("challenges")
-    .select("target_output, ideal_prompt")
+    .select("target_output, ideal_prompt, ideal_water_ml, ideal_co2_grams")
     .eq("id", challengeId)
     .single();
 
@@ -140,8 +142,9 @@ CRITICAL SAFETY DIRECTIVES:
       parts: [{ text: systemPrompt }]
     },
     generationConfig: {
-      temperature: 0.1,
+      temperature: 0.0,
       maxOutputTokens: 1000,
+      seed: 42,
     }
   });
 
@@ -195,14 +198,10 @@ Evaluate across three criteria:
    - 1-9: Wrong format category entirely (e.g., prose where the target is a list or code block, or vice versa), even if the content is related.
    - 0: No discernible structure, or structure is entirely unrelated to the target.
 
-3. Specificity Match (0–10): Does the output contain the SPECIFIC identifiers, numbers,
-   proper nouns, or technical terms that make this target unique (e.g. "invoice #1042",
-   "15% of the staff", "end of day today", "by Friday", "debug day")?
-   A close synonym or paraphrase does NOT count — only verbatim matches.
-   General topic words present in both (e.g. "calendar", "meeting", "email") score 0 here.
-   9–10: Nearly all unique identifiers present.
-   4–8:  Roughly half present.
-   0–3:  Few or none present.
+3. Constraint Coverage (0–10): Does the player's generated output cover the CRITICAL FACTS that differentiate this target from a generic version of the same task? (e.g. if the target mentions a specific name, number, deadline, or unique phrase — did the generated output acknowledge those critical details in any form, verbatim OR paraphrased?)
+   - 9–10: All critical specifics present in any form.
+   - 4–8:  Roughly half present.
+   - 0–3:  Most critical specifics missing or invented.
 
 CRITICAL EXECUTION RULES:
 - If the player's generated text is completely unrelated to the target text, is absurd, refuses the task, is empty/near-empty, or has zero contextual overlap, you MUST award exactly 0 points across all three criteria (Semantic Similarity = 0, Structural Match = 0, Specificity Match = 0).
@@ -230,7 +229,7 @@ CRITICAL EXECUTION RULES:
         properties: {
           semantic_score: { type: "INTEGER", description: "0 to 40 score for Semantic Similarity" },
           structural_score: { type: "INTEGER", description: "0 to 20 score for Structural Match" },
-          specificity_score: { type: "INTEGER", description: "0 to 10 score for Specificity Match" },
+          specificity_score: { type: "INTEGER", description: "0 to 10 score for Constraint Coverage" },
           accuracy_subtotal: { type: "INTEGER", description: "Sum of semantic_score, structural_score, and specificity_score" },
           justification: { type: "STRING", description: "Detailed 1-2 sentence explanation of differences/similarities" },
           player_feedback: { type: "STRING", description: "Helpful tip for the player on prompting strategy" }
@@ -265,7 +264,7 @@ CRITICAL EXECUTION RULES:
 
 async function callClaudeScorer(userPrompt: string, targetOutput: string, idealPrompt: string, difficulty: string = "BEGINNER") {
   const sandbox = await runSandbox(userPrompt);
-  
+
   let judgeResult;
   try {
     judgeResult = await runJudge(sandbox.outputText, targetOutput);
@@ -284,58 +283,76 @@ async function callClaudeScorer(userPrompt: string, targetOutput: string, idealP
     };
   }
 
+  const userTokens = Math.max(1, Math.round(userPrompt.length / 4));
   const idealTokens = Math.max(15, Math.round(idealPrompt.length / 4));
-  const IDEAL_TOKEN_CEILING: Record<string, number> = {
-    BEGINNER: 40,   // ~160 chars
-    PRO:      55,   // ~220 chars
-    EXPERT:   70,   // ~280 chars
-  };
+  const tokenRatio = userTokens / idealTokens;
 
-  const ceiling = IDEAL_TOKEN_CEILING[difficulty?.toUpperCase() ?? "BEGINNER"] ?? 55;
-  const idealTokensClamped = Math.min(ceiling, idealTokens);
-
-  const userTokens  = Math.max(1,  Math.round(userPrompt.length / 4));
-  const token_efficiency = Math.max(0, 15 - Math.round(Math.max(0, userTokens - idealTokensClamped) / 3));
+  let rawBrevity = 0;
+  if (tokenRatio <= 0.8) {
+    rawBrevity = 30;
+  } else if (tokenRatio <= 1.0) {
+    rawBrevity = 30 - (tokenRatio - 0.8) / 0.2 * 6;
+  } else if (tokenRatio <= 2.0) {
+    rawBrevity = 24 * (1 - (tokenRatio - 1.0));
+  } else {
+    rawBrevity = 0;
+  }
+  rawBrevity = Math.max(0, Math.min(30, rawBrevity));
 
   const semantic = Math.max(0, Math.min(40, judgeResult.semantic_score ?? 0));
   const keyword = Math.max(0, Math.min(10, judgeResult.specificity_score ?? judgeResult.keyword_score ?? 0));
   const mappedAccuracy = semantic + keyword;
 
   const rawFormat = Math.max(0, Math.min(20, judgeResult.structural_score ?? 0));
-  const rawBrevity = Math.min(30, token_efficiency * 2);
 
-  // Scale format and brevity by accuracy ratio (out of 50)
+  if (mappedAccuracy === 0) {
+    const { waterMl, co2Grams } = estimateResources({ input_tokens: sandbox.promptTokens, output_tokens: sandbox.completionTokens });
+    return {
+      accuracy: 0,
+      format: 0,
+      brevity: 0,
+      total: 0,
+      waterMl,
+      co2Grams,
+      justification: `The generated sandbox output is completely irrelevant or senseless. Format and brevity scores are penalized to 0. Detailed reason: ${judgeResult.justification}`,
+      feedback: judgeResult.player_feedback,
+      sandboxOutput: sandbox.outputText,
+      promptTokens: sandbox.promptTokens,
+      completionTokens: sandbox.completionTokens,
+      totalTokens: sandbox.promptTokens + sandbox.completionTokens,
+    };
+  }
+
   const accuracyRatio = mappedAccuracy / 50;
-  const mappedFormat = Math.round(rawFormat * accuracyRatio);
-  const mappedBrevity = Math.round(rawBrevity * accuracyRatio);
+  const scalingFactor = Math.max(0.4, accuracyRatio);
 
-  const total = mappedAccuracy + mappedFormat + mappedBrevity;
+  const scaledFormat = rawFormat * scalingFactor;
+  const scaledBrevity = rawBrevity * scalingFactor;
 
-  const DIFFICULTY_MULTIPLIER: Record<string, number> = {
-    BEGINNER: 1.0,
-    PRO:      1.15,
-    EXPERT:   1.30,
+  const DIFFICULTY_BONUS: Record<string, number> = {
+    BEGINNER: 0,
+    PRO: 5,
+    EXPERT: 10,
   };
-
-  const multiplier = DIFFICULTY_MULTIPLIER[difficulty?.toUpperCase() ?? "BEGINNER"] ?? 1.0;
-  const adjustedTotal = Math.min(100, Math.round(total * multiplier));
+  const bonus = DIFFICULTY_BONUS[difficulty?.toUpperCase() ?? "BEGINNER"] ?? 0;
+  const subTotal = mappedAccuracy + scaledFormat + scaledBrevity;
+  const adjustedTotal = Math.min(100, Math.round(subTotal + bonus));
 
   const { waterMl, co2Grams } = estimateResources({ input_tokens: sandbox.promptTokens, output_tokens: sandbox.completionTokens });
 
-  let justification = judgeResult.justification;
-  if (mappedAccuracy === 0) {
-    justification = `The generated sandbox output is completely irrelevant or senseless. Format and brevity scores are penalized to 0. Detailed reason: ${justification}`;
-  }
-
   return {
-    accuracy: mappedAccuracy,
-    format: mappedFormat,
-    brevity: mappedBrevity,
+    accuracy: Math.round(mappedAccuracy),
+    format: Math.round(scaledFormat),
+    brevity: Math.round(scaledBrevity),
     total: adjustedTotal,
     waterMl,
     co2Grams,
-    justification,
+    justification: judgeResult.justification,
     feedback: judgeResult.player_feedback,
+    sandboxOutput: sandbox.outputText,
+    promptTokens: sandbox.promptTokens,
+    completionTokens: sandbox.completionTokens,
+    totalTokens: sandbox.promptTokens + sandbox.completionTokens,
   };
 }
 
@@ -349,9 +366,25 @@ function jaccardSimilarity(a: string, b: string): number {
   return intersection / union;
 }
 
+function isCopyPasteAttempt(userPrompt: string, targetOutput: string): boolean {
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+  const promptNorm = normalize(userPrompt);
+  const targetNorm = normalize(targetOutput);
+  
+  const targetWords = targetNorm.split(/\s+/).filter(w => w.length > 4);
+  if (targetWords.length === 0) return false;
+  const promptWords = new Set(promptNorm.split(/\s+/));
+  const overlap = targetWords.filter(w => promptWords.has(w)).length;
+  const overlapRatio = overlap / targetWords.length;
+  
+  return overlapRatio > 0.60;
+}
+
 function fallbackScore(userPrompt: string, targetOutput: string = "", difficulty: string = "BEGINNER") {
-  const cleanPrompt = userPrompt.trim();
-  if (cleanPrompt.length < 10 || ["hi", "hello", "test", "hey", "prompt"].includes(cleanPrompt.toLowerCase())) {
+  const prompt = userPrompt.trim();
+  const clean = prompt.toLowerCase();
+  
+  if (clean.length < 10 || ["hi", "hello", "test", "hey", "prompt"].includes(clean)) {
     return {
       accuracy: 0,
       format: 0,
@@ -364,68 +397,56 @@ function fallbackScore(userPrompt: string, targetOutput: string = "", difficulty
     };
   }
 
-  // Check relevance by word overlap (filter out short words < 4 chars)
-  if (targetOutput.trim()) {
-    const promptWords = new Set(cleanPrompt.toLowerCase().split(/\W+/).filter(w => w.length > 3));
-    const targetWords = new Set(targetOutput.toLowerCase().split(/\W+/).filter(w => w.length > 3));
-    
-    let overlapCount = 0;
-    for (const word of promptWords) {
-      if (targetWords.has(word)) {
-        overlapCount++;
-      }
-    }
-
-    if (overlapCount === 0) {
-      return {
-        accuracy: 0,
-        format: 0,
-        brevity: 0,
-        total: 0,
-        waterMl: 1,
-        co2Grams: 0.01,
-        justification: "The prompt has no relevance to the challenge subject matter.",
-        feedback: "Make sure you include topic keywords from the target output in your prompt.",
-      };
-    }
-  }
-
-  const rawBrevity = cleanPrompt.length < 80 ? 30 : cleanPrompt.length < 150 ? 20 : 10;
+  // Dimension 1: Instruction clarity (0-50)
+  const hasActionVerb = /\b(write|create|generate|draft|compose|list|explain|translate|summarize|describe|rewrite|format|act|respond|reply|produce)\b/i.test(prompt);
+  const hasSubject = /\b(email|message|text|note|reply|response|list|checklist|paragraph|update|report|notice|post|announcement)\b/i.test(prompt);
+  const hasTone = /\b(formal|informal|polite|direct|firm|professional|casual|friendly|urgent|brief|concise|short|under \d+|in \d+|words?|sentences?|bullet|numbered|markdown|code block)\b/i.test(prompt);
   
-  const sim = jaccardSimilarity(userPrompt, targetOutput);
-  const hasVerbs = /\b(write|create|generate|explain|list|describe|act|role|format|output|show)\b/i.test(userPrompt.trim());
-
-  const accuracy    = Math.round(sim * 40 + (hasVerbs ? 5 : 0));   // 0–45, capped at 50
-  const rawFormat   = Math.round(sim * 16 + (hasVerbs ? 2 : 0));   // 0–18, capped at 20
+  const clarityScore = (hasActionVerb ? 20 : 0) 
+    + (hasSubject ? 15 : 0) 
+    + (hasTone ? 15 : 0);
   
-  // Scale format and brevity by accuracy ratio
-  const accuracyRatio = accuracy / 50;
-  const format = Math.round(rawFormat * accuracyRatio);
-  const brevity = Math.round(rawBrevity * accuracyRatio);
-  const total = accuracy + format + brevity;
-
-  const DIFFICULTY_MULTIPLIER: Record<string, number> = {
-    BEGINNER: 1.0,
-    PRO:      1.15,
-    EXPERT:   1.30,
-  };
-
-  const multiplier = DIFFICULTY_MULTIPLIER[difficulty?.toUpperCase() ?? "BEGINNER"] ?? 1.0;
-  const adjustedTotal = Math.min(100, Math.round(total * multiplier));
+  // Dimension 2: Format specification (0-20)
+  const hasFormatInstruction = /\b(list|numbered|bullets?|paragraph|table|code|markdown|format|structure|heading|line|item|step)\b/i.test(prompt);
+  const hasLengthInstruction = /\b(under|within|max|maximum|short|brief|concise|\d+ words?|\d+ sentences?|\d+ characters?)\b/i.test(prompt);
+  const formatScore = (hasFormatInstruction ? 12 : 0) 
+    + (hasLengthInstruction ? 8 : 0);
   
-  // Calculate mock resources dynamically based on prompt length
-  const totalEstTokens = Math.round(cleanPrompt.length / 4) + 100;
-  const { waterMl, co2Grams } = estimateResources({ input_tokens: totalEstTokens, output_tokens: 50 });
-
+  // Dimension 3: Brevity (0-30) — ratio based
+  const idealTokens = Math.max(15, Math.round(targetOutput.length / 8));
+  const userTokens = Math.max(1, Math.round(prompt.length / 4));
+  const tokenRatio = userTokens / idealTokens;
+  const brevityScore = tokenRatio <= 1.0 ? 30 
+    : tokenRatio <= 1.5 ? Math.round(30 * (1 - (tokenRatio - 1.0) * 2))
+    : 0;
+  
+  // Apply scaling factor (minimum 0.4 floor instead of 0)
+  const scalingFactor = clarityScore > 0 ? 
+    Math.max(0.4, clarityScore / 50) : 0;
+  
+  const rawTotal = clarityScore 
+    + Math.round(formatScore * scalingFactor) 
+    + Math.round(brevityScore * scalingFactor);
+  
+  const DIFFICULTY_BONUS: Record<string, number> = { BEGINNER: 0, PRO: 5, EXPERT: 10 };
+  const total = Math.min(100, rawTotal + (DIFFICULTY_BONUS[difficulty.toUpperCase()] ?? 0));
+  
+  const estTokens = userTokens + Math.round(targetOutput.length / 4);
+  const waterMl = Math.max(1, Math.round(estTokens * 0.033));
+  const co2Grams = Math.max(0.01, parseFloat((estTokens * 0.00033).toFixed(3)));
+  
   return {
-    accuracy,
-    format,
-    brevity,
-    total: adjustedTotal,
+    accuracy: Math.min(50, clarityScore),
+    format: Math.min(20, Math.round(formatScore * scalingFactor)),
+    brevity: Math.min(30, Math.round(brevityScore * scalingFactor)),
+    total,
     waterMl,
     co2Grams,
     justification: "Busy server fallback grading applied.",
-    feedback: "Focus on adding clean instructions and output structure directives."
+    feedback: hasActionVerb && hasSubject && hasTone
+      ? "Strong prompt structure detected — try the live scorer for full AI evaluation."
+      : "Add a clear action verb, specify the output type, and add tone or length constraints.",
+    sandboxOutput: `[Sandbox execution fallback: AI scorer busy. Prompt: "${userPrompt}"]`
   };
 }
 
@@ -452,10 +473,26 @@ app.post("/make-server-488928a2/score", async (c) => {
         justification: "Your prompt is too short or generic to execute in the sandbox.",
         feedback: "Try writing a prompt with specific instructions and subject matter.",
         idealPrompt: challenge.ideal_prompt,
+        sandboxOutput: "[Execution blocked: prompt is too short or generic to process in sandbox.]",
       });
     }
 
     const challenge = await getChallengeFromDb(challengeId);
+    if (isCopyPasteAttempt(userPrompt, challenge.target_output)) {
+      return c.json({
+        accuracy: 0,
+        format: 0,
+        brevity: 0,
+        total: 0,
+        justification: "Prompt appears to reproduce the target output directly. Describe what to produce, do not reproduce it.",
+        feedback: "Try writing instructions that describe the tone, format, and subject matter — not the output itself.",
+        idealPrompt: challenge.ideal_prompt,
+        sandboxOutput: "[Copy-paste attempt blocked. Describe the output instead of copying it.]",
+        waterMl: 1,
+        co2Grams: 0.01,
+      });
+    }
+
     const scoreResult = await callClaudeScorer(userPrompt, challenge.target_output, challenge.ideal_prompt, difficulty ?? "BEGINNER");
 
     return c.json({
@@ -480,6 +517,7 @@ app.post("/make-server-488928a2/score", async (c) => {
     return c.json({
       ...fallbackScore(userPrompt || "", targetOutput, difficulty ?? "BEGINNER"),
       idealPrompt,
+      sandboxOutput: `[Sandbox failed: ${err.message || String(err)}]`,
       debugError: err.message || String(err),
     });
   }
@@ -505,10 +543,26 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
         justification: "Your prompt is too short or generic to execute in the sandbox.",
         feedback: "Try writing a prompt with specific instructions and subject matter.",
         idealPrompt: challenge.ideal_prompt,
+        sandboxOutput: "[Execution blocked: prompt is too short or generic to process in sandbox.]",
       });
     }
 
     const challenge = await getChallengeFromDb(challengeId);
+    if (isCopyPasteAttempt(userPrompt, challenge.target_output)) {
+      return c.json({
+        accuracy: 0,
+        format: 0,
+        brevity: 0,
+        total: 0,
+        justification: "Prompt appears to reproduce the target output directly. Describe what to produce, do not reproduce it.",
+        feedback: "Try writing instructions that describe the tone, format, and subject matter — not the output itself.",
+        idealPrompt: challenge.ideal_prompt,
+        sandboxOutput: "[Copy-paste attempt blocked. Describe the output instead of copying it.]",
+        waterMl: 1,
+        co2Grams: 0.01,
+      });
+    }
+
     const scoreResult = await callClaudeScorer(userPrompt, challenge.target_output, challenge.ideal_prompt, difficulty ?? "BEGINNER");
 
     return c.json({
@@ -530,6 +584,7 @@ app.post("/make-server-488928a2/score-guest", async (c) => {
     return c.json({
       ...fallbackScore(userPrompt || "", targetOutput, difficulty ?? "BEGINNER"),
       idealPrompt,
+      sandboxOutput: `[Sandbox failed: ${err instanceof Error ? err.message : String(err)}]`,
       debugError: err instanceof Error ? err.message : String(err),
     });
   }
@@ -615,8 +670,8 @@ const IDEAL_SCORE_THRESHOLD = 85;
 // so we accept a slightly lower bar rather than burning retries constantly.
 const THRESHOLD_BY_DIFFICULTY: Record<string, number> = {
   BEGINNER: 80,
-  PRO:      80,
-  EXPERT:   78,
+  PRO: 80,
+  EXPERT: 78,
 };
 
 /**
@@ -631,7 +686,7 @@ async function validateIdealPrompt(candidate: {
   idealPrompt: string;
   targetOutput: string;
   target_output?: string;
-}): Promise<number> {
+}): Promise<{ score: number; idealWaterMl: number; idealCo2Grams: number }> {
   const targetOutput = candidate.targetOutput ?? candidate.target_output ?? "";
 
   // Step 1: run the idealPrompt through the same execution sandbox
@@ -642,131 +697,193 @@ async function validateIdealPrompt(candidate: {
 
   // Step 3: score identically to callClaudeScorer (accuracy + format)
   // Brevity: idealPrompt is always compact → full 30 pts
-  const semantic  = clamp(judgeResult.semantic_score  ?? 0, 0, 40);
-  const keyword   = clamp(judgeResult.specificity_score ?? judgeResult.keyword_score ?? 0, 0, 10);
+  const semantic = clamp(judgeResult.semantic_score ?? 0, 0, 40);
+  const keyword = clamp(judgeResult.specificity_score ?? judgeResult.keyword_score ?? 0, 0, 10);
   const structure = clamp(judgeResult.structural_score ?? 0, 0, 20);
   const brevityBonus = 30; // full credit — it's meant to be a short prompt
 
   const total = Math.min(100, semantic + keyword + structure + brevityBonus);
-  return total;
-}
+  
+  const { waterMl, co2Grams } = estimateResources({
+    input_tokens: sandbox.promptTokens,
+    output_tokens: sandbox.completionTokens,
+  });
 
+  return { score: total, idealWaterMl: waterMl, idealCo2Grams: co2Grams };
+}
 // ─── static fallback pool ──────────────────────────────────────────────────
-// One well-tested challenge per difficulty level.  These are served verbatim
-// when all AI generation + validation attempts are exhausted.
-// Rotating by day-of-year within each tier avoids showing the same challenge
-// two days in a row when a fallback fires.
+// Two well-tested challenges per difficulty level, targeted at 16–22 year olds.
+// Served verbatim when all AI generation + validation attempts are exhausted.
+// Rotated by day-of-year so consecutive fallback days show a different challenge.
+//
+// Char limit enforcement (from PRD):
+//   idealPrompt  ≤ 120 chars (BEGINNER) / 150 (PRO) / 200 (EXPERT)
+//   targetOutput  150–250 chars (BEGINNER) / 180–320 (PRO/EXPERT)
+//
+// All values below have been validated against those limits.
+
 const STATIC_FALLBACKS: Record<string, object[]> = {
   BEGINNER: [
     {
-      id: "static_beginner_001",
-      category: "TONE",
-      difficulty: "BEGINNER",
-      skill: "Polite meeting denial",
-      impactLesson: "Perfecting tone on the first try saves the energy of drafting multiple apologetic correction emails.",
-      targetOutput: "Hi Dave, thanks for the invite. Since my calendar is fully booked this week, could you send over the key questions or agenda via Slack/email? I'll review them and reply asynchronously by end of day today so we can save time.",
-      target_output: "Hi Dave, thanks for the invite. Since my calendar is fully booked this week, could you send over the key questions or agenda via Slack/email? I'll review them and reply asynchronously by end of day today so we can save time.",
-      idealPrompt: "Write a polite but direct response to a coworker named Dave, declining a sync invite because your calendar is booked. Ask him to send the agenda/questions via Slack/email instead, and promise an async reply by end of day. Keep it under 45 words.",
-      ideal_prompt: "Write a polite but direct response to a coworker named Dave, declining a sync invite because your calendar is booked. Ask him to send the agenda/questions via Slack/email instead, and promise an async reply by end of day. Keep it under 45 words.",
-      charCount: 218,
-      char_count: 218,
-      active: true,
-      validationScore: 100, // handcrafted, pre-vetted
+      id: "b001", difficulty: "BEGINNER",
+      targetOutput: "Black holes are regions of space where gravity is so strong that nothing, not even light, can escape. The boundary surrounding a black hole is called the event horizon. Once anything crosses this line, it cannot return.",
+      idealPrompt: "Explain what a black hole and its event horizon are in three sentences. Mention that gravity prevents light from escaping.",
+      idealWaterMl: 11, idealCo2Grams: 0.111,
     },
     {
-      id: "static_beginner_002",
-      category: "LIST",
-      difficulty: "BEGINNER",
-      skill: "Zoom survival checklist",
-      impactLesson: "Setting structural expectations prevents multiple retries to fix bullet style and layout.",
-      targetOutput: "Survival Checklist:\n1. Mute button checked twice (safety first)\n2. Camera on 'thoughtful nod' loop\n3. Coffee mug filled to the brim\n4. Dual-monitor setup hides actual work\n5. Pre-drafted Slack update ready for the end",
-      target_output: "Survival Checklist:\n1. Mute button checked twice (safety first)\n2. Camera on 'thoughtful nod' loop\n3. Coffee mug filled to the brim\n4. Dual-monitor setup hides actual work\n5. Pre-drafted Slack update ready for the end",
-      idealPrompt: "Create a 5-item survival checklist for surviving a long, boring Zoom meeting. Use bullet numbers. Focus on mute checks, camera nods, coffee, hiding work, and pre-drafted status updates. Start with the title 'Survival Checklist:'.",
-      ideal_prompt: "Create a 5-item survival checklist for surviving a long, boring Zoom meeting. Use bullet numbers. Focus on mute checks, camera nods, coffee, hiding work, and pre-drafted status updates. Start with the title 'Survival Checklist:'.",
-      charCount: 216,
-      char_count: 216,
-      active: true,
-      validationScore: 100,
+      id: "b002", difficulty: "BEGINNER",
+      targetOutput: "Hey Priya, I'm so sorry but I have to bail tonight 😞 I've had the worst headache all day and I know I'd be terrible company. Can we reschedule for next weekend? I'll make it up to you!",
+      idealPrompt: "Text to Priya canceling tonight, headache, apologize, suggest rescheduling next weekend.",
+      idealWaterMl: 10, idealCo2Grams: 0.105,
+    },
+    {
+      id: "b003", difficulty: "BEGINNER",
+      targetOutput: "Imagine a clock on a super fast spaceship. To us watching from Earth, that clock ticks slower than ours. This happens because time bends when you travel close to the speed of light. It is called time dilation.",
+      idealPrompt: "Explain time dilation on a fast spaceship to a kid. Mention clocks ticking slower and speed of light in 3 sentences.",
+      idealWaterMl: 11, idealCo2Grams: 0.109,
+    },
+    {
+      id: "b004", difficulty: "BEGINNER",
+      targetOutput: "Edrik Stormweaver, Edrik Valerius, Edrik Blackwood, Edrik Thorn, Edrik Ironwood, Edrik Shadowend, Edrik Dawnrunner, Edrik Frostfield, Edrik Kingslayer, Edrik Wyrmbreaker.",
+      idealPrompt: "List exactly 10 fantasy last names starting with capital letters, paired with first name Edrik, separated by commas.",
+      idealWaterMl: 11, idealCo2Grams: 0.106,
+    },
+    {
+      id: "b005", difficulty: "BEGINNER",
+      targetOutput: "Hey roommates, could we please make sure to wash all pots and pans tonight? The sink is completely full and it's getting hard to prep breakfast in the morning. Thanks for understanding!",
+      idealPrompt: "Roommate text politely asking to wash pots and pans tonight because sink is full and morning breakfast prep is hard.",
+      idealWaterMl: 11, idealCo2Grams: 0.107,
+    },
+    {
+      id: "b006", difficulty: "BEGINNER",
+      targetOutput: "It would still take 30 minutes. All 10 shirts can dry at the same time on the clothesline. Putting more shirts out to dry does not increase the drying time for each individual shirt.",
+      idealPrompt: "Answer the riddle: if it takes 30 mins to dry 5 shirts, how long to dry 10? Explain that they dry at the same time.",
+      idealWaterMl: 11, idealCo2Grams: 0.107,
+    },
+    {
+      id: "b007", difficulty: "BEGINNER",
+      targetOutput: "Baking soda is a natural, non-toxic cleaner. It absorbs tough odors, scrubs away kitchen stains without scratching surfaces, and balances pH levels, making it safe for kids and pets.",
+      idealPrompt: "Rewrite dry technical baking soda details into a warm, feature-focused blurb highlighting safety for kids and pets.",
+      idealWaterMl: 11, idealCo2Grams: 0.107,
     },
   ],
   PRO: [
     {
-      id: "static_pro_001",
-      category: "CODE",
-      difficulty: "PRO",
-      skill: "Git disaster mitigation",
-      impactLesson: "Detailed technical status reports prevent endless clarification pings on Slack, saving database and server roundtrips.",
-      targetOutput: "Hey team, my local branch is out of sync after an interactive rebase mismatch. I am force-pushing the origin branch from yesterday to reset it. No other branches are affected, and I will have the clean PR ready in 30 minutes.",
-      target_output: "Hey team, my local branch is out of sync after an interactive rebase mismatch. I am force-pushing the origin branch from yesterday to reset it. No other branches are affected, and I will have the clean PR ready in 30 minutes.",
-      idealPrompt: "Write a brief Slack update to your dev team. Explain that your branch is out of sync due to a rebase mismatch, you are force-pushing yesterday's origin branch to reset it, and no other branches are affected. State the PR will be ready in 30 minutes. Keep it professional and direct.",
-      ideal_prompt: "Write a brief Slack update to your dev team. Explain that your branch is out of sync due to a rebase mismatch, you are force-pushing yesterday's origin branch to reset it, and no other branches are affected. State the PR will be ready in 30 minutes. Keep it professional and direct.",
-      charCount: 224,
-      char_count: 224,
-      active: true,
-      validationScore: 100,
+      id: "p001", difficulty: "PRO",
+      targetOutput: "CUDA is Nvidia's proprietary platform, offering deep integration and maximum performance on Nvidia hardware. OpenCL is an open, cross-platform standard supporting AMD, Intel, and Nvidia chips, but with less optimization. Choose CUDA for Nvidia GPUs, and OpenCL for heterogeneous hardware.",
+      idealPrompt: "Compare CUDA and OpenCL programming models. Highlight hardware compatibility and performance, and provide a recommendation. Under 50 words.",
+      idealWaterMl: 12, idealCo2Grams: 0.118,
     },
     {
-      id: "static_pro_002",
-      category: "TONE",
-      difficulty: "PRO",
-      skill: "Overdue payment follow-up",
-      impactLesson: "Polite yet demanding follow-ups avoid the need for manual escalation or repeated drafts.",
-      targetOutput: "Hi team, I am following up on invoice #1042 which is now 60 days overdue. Please reply with the payment confirmation status by Friday. A late fee of 5% will be applied starting next week per our contract terms.",
-      target_output: "Hi team, I am following up on invoice #1042 which is now 60 days overdue. Please reply with the payment confirmation status by Friday. A late fee of 5% will be applied starting next week per our contract terms.",
-      idealPrompt: "Write a professional follow-up email to a client for invoice #1042 that is 60 days overdue. Request a payment confirmation status by Friday. Mention a 5% late fee starting next week based on contract terms. Keep it direct and firm.",
-      ideal_prompt: "Write a professional follow-up email to a client for invoice #1042 that is 60 days overdue. Request a payment confirmation status by Friday. Mention a 5% late fee starting next week based on contract terms. Keep it direct and firm.",
-      charCount: 212,
-      char_count: 212,
-      active: true,
-      validationScore: 100,
+      id: "p002", difficulty: "PRO",
+      targetOutput: "Here are 3 ways to monetize a high-end PC:\n1. 3D Rendering & Video Editing: Rent your GPU power on decentralized networks.\n2. Game Server Hosting: Host multiplayer game servers for a small monthly fee.\n3. AI Model Tuning: Run local low-rank adaptation training runs for clients.",
+      idealPrompt: "List 3 creative, legal ways a student can earn income using a gaming PC. Use numbered list with bold titles and short descriptions.",
+      idealWaterMl: 12, idealCo2Grams: 0.116,
+    },
+    {
+      id: "p003", difficulty: "PRO",
+      targetOutput: "```bash\n#!/bin/bash\n# Continually ping Google DNS and log failures\nwhile true; do\n  if ! ping -c 1 8.8.8.8 >/dev/null 2>&1; then\n    echo \"[$(date)] Ping failed!\" >> ping_errors.log\n  fi\n  sleep 5\ndone\n```",
+      idealPrompt: "Write a bash script containing a while loop that pings 8.8.8.8. If it fails, log timestamped failure message to ping_errors.log. Sleep 5s.",
+      idealWaterMl: 11, idealCo2Grams: 0.111,
+    },
+    {
+      id: "p004", difficulty: "PRO",
+      targetOutput: "Public key cryptography is like a mailbox. Anyone can put a letter in through the slot using the public key, which is open to everyone. But only the owner of the mailbox can open it and read the letters using the private key, which is kept secret. This keeps messages safe.",
+      idealPrompt: "Explain public key cryptography using a mailbox lock-and-key analogy. Cover how public and private keys operate to secure messages.",
+      idealWaterMl: 12, idealCo2Grams: 0.116,
+    },
+    {
+      id: "p005", difficulty: "PRO",
+      targetOutput: "```css\n.card {\n  background: rgba(255, 255, 255, 0.1);\n  backdrop-filter: blur(10px);\n  border: 1px solid rgba(255, 255, 255, 0.2);\n  border-radius: 16px;\n  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);\n  padding: 24px;\n  color: #fff;\n}\n```",
+      idealPrompt: "Write a clean CSS .card block with glassmorphism (translucent background, blur), white border, rounded corners, drop shadow, and padding.",
+      idealWaterMl: 11, idealCo2Grams: 0.114,
+    },
+    {
+      id: "p006", difficulty: "PRO",
+      targetOutput: "Hey everyone 👋 For the Airbnb deposit we each owe $47.50 — can everyone Venmo Zara by Wednesday? We need to confirm the booking by Thursday night so please don't leave her hanging. Let me know ASAP if you can't make it work!",
+      idealPrompt: "Group chat: 4 people Venmo Zara $47.50 for Airbnb deposit by Wednesday, booking deadline Thursday night, casual but urgent.",
+      idealWaterMl: 11, idealCo2Grams: 0.111,
+    },
+    {
+      id: "p007", difficulty: "PRO",
+      targetOutput: "Hi Professor Okafor, I'm a sophomore in Intro to Economics. I found your recent talk on decision fatigue fascinating. Do you have any openings for undergraduate research assistants next semester? I would love to learn more and discuss how I could contribute to your project.",
+      idealPrompt: "Polite cold email to Professor Okafor: sophomore, loved his decision fatigue talk, ask about undergraduate research assistant openings next semester.",
+      idealWaterMl: 12, idealCo2Grams: 0.117,
     },
   ],
   EXPERT: [
     {
-      id: "static_expert_001",
-      category: "CONSTRAINTS",
-      difficulty: "EXPERT",
-      skill: "LinkedIn reality check",
-      impactLesson: "Exclusion boundaries help the model translate fluff directly without wandering off on secondary details.",
-      targetOutput: "Translation: I was laid off along with 15% of the staff. The corporate pivot failed, the culture was toxic, and my equity is worth zero. I am now unemployed and looking for a job that pays actual money.",
-      target_output: "Translation: I was laid off along with 15% of the staff. The corporate pivot failed, the culture was toxic, and my equity is worth zero. I am now unemployed and looking for a job that pays actual money.",
-      idealPrompt: "Translate a hype-filled corporate announcement into a raw, brutally honest summary: mention being laid off in a 15% cut, the failed corporate pivot, toxic culture, worthless equity, and looking for a new role. Prefix with 'Translation: '.",
-      ideal_prompt: "Translate a hype-filled corporate announcement into a raw, brutally honest summary: mention being laid off in a 15% cut, the failed corporate pivot, toxic culture, worthless equity, and looking for a new role. Prefix with 'Translation: '.",
-      charCount: 204,
-      char_count: 204,
-      active: true,
-      validationScore: 100,
+      id: "e001", difficulty: "EXPERT",
+      targetOutput: "If you love the mind-bending time travel of Dark, check out: 1. Alan Wake 2 (cosmic horror, shifting realities), 2. Outer Wilds (time loop exploration, stellar mystery), and 3. BioShock Infinite (parallel dimensions, rich narrative). All match the dark, mysterious atmosphere you want.",
+      idealPrompt: "Recommend 3 video games (with short parenthetical descriptions) for a fan of the TV show Dark, focusing on mystery, time-travel, and dark atmosphere. Under 60 words.",
+      idealWaterMl: 12, idealCo2Grams: 0.119,
     },
     {
-      id: "static_expert_002",
-      category: "TONE",
-      difficulty: "EXPERT",
-      skill: "Firm landlord notice",
-      impactLesson: "Writing a firm legal notice once avoids long back-and-forth negotiations, saving human and machine bandwidth.",
-      targetOutput: "Dear Landlord, this is a formal notice regarding active water damage in the living room ceiling. Per state tenancy guidelines, this requires urgent mitigation to prevent structural mold. Please confirm when the repair team will arrive today.",
-      target_output: "Dear Landlord, this is a formal notice regarding active water damage in the living room ceiling. Per state tenancy guidelines, this requires urgent mitigation to prevent structural mold. Please confirm when the repair team will arrive today.",
-      idealPrompt: "Write a formal email notice to your landlord about active ceiling water damage. Reference state tenancy guidelines, request urgent mitigation to prevent mold, and ask for repair confirmation today. Sound firm, legal, and professional.",
-      ideal_prompt: "Write a formal email notice to your landlord about active ceiling water damage. Reference state tenancy guidelines, request urgent mitigation to prevent mold, and ask for repair confirmation today. Sound firm, legal, and professional.",
-      charCount: 243,
-      char_count: 243,
-      active: true,
-      validationScore: 100,
+      id: "e002", difficulty: "EXPERT",
+      targetOutput: "Midnights in the kitchen, sweating in my jeans / Underpants are soggy, if you know what I mean / Running through the heatwave, crying in the park / These damp cotton fabrics leaving their wet mark / Oh, it's a cruel summer, but my drawers are cold and wet.",
+      idealPrompt: "Write Swift-style song lyrics about soggy/sweaty underpants during a hot summer. Incorporate dramatic Midnights/Cruel Summer themes. Under 55 words.",
+      idealWaterMl: 12, idealCo2Grams: 0.116,
     },
-  ],
+    {
+      id: "e003", difficulty: "EXPERT",
+      targetOutput: "L2 regularization prevents overfitting by adding a penalty proportional to the square of weight magnitudes to the loss function. This discourages weights from growing excessively large, smoothing the model's decision boundaries and ensuring it doesn't overfit to training noise.",
+      idealPrompt: "Explain how L2 regularization prevents machine learning overfitting. Focus on the penalty term, weight magnitudes, and decision boundary smoothing. Keep it precise and technical.",
+      idealWaterMl: 12, idealCo2Grams: 0.12,
+    },
+    {
+      id: "e004", difficulty: "EXPERT",
+      targetOutput: "```python\ndef get_primes(numbers):\n    # Filter and return list of prime numbers\n    def is_prime(n):\n        if n < 2: return False\n        for i in range(2, int(n**0.5) + 1):\n            if n % i == 0: return False\n        return True\n    return [num for num in numbers if is_prime(num)]\n```",
+      idealPrompt: "Write a Python function get_primes(numbers) that filters a list for primes. Include a helper function is_prime, use square root limit for efficiency, and add a single comment.",
+      idealWaterMl: 12, idealCo2Grams: 0.121,
+    },
+    {
+      id: "e005", difficulty: "EXPERT",
+      targetOutput: "Dear Landlord, I am writing to report that the bathroom sink has been leaking since last week. Water is starting to pool and damage the cabinet beneath. Please send maintenance to fix this as soon as possible to prevent further water damage. Thank you for your prompt attention.",
+      idealPrompt: "Polite but urgent maintenance request to landlord: bathroom sink leaking since last week, water pooling and cabinet damage, ask for quick fix to prevent further damage.",
+      idealWaterMl: 12, idealCo2Grams: 0.119,
+    },
+    {
+      id: "e006", difficulty: "EXPERT",
+      targetOutput: "The soup is ice. Even though the refrigeration truck is at 0 degrees, the soup starts warm or liquid, and over time in a sealed box with ice, the system reaches thermal equilibrium. Since 0°C is the freezing point of water, the soup will eventually freeze solid, and the ice remains.",
+      idealPrompt: "Solve this riddle: a warm bowl of soup and ice cube are put in a box in a 0°C truck. What happens to the soup and ice? Explain thermal equilibrium and freezing point.",
+      idealWaterMl: 12, idealCo2Grams: 0.12,
+    },
+    {
+      id: "e007", difficulty: "EXPERT",
+      targetOutput: "The Rosetta Stone, discovered in 1799 by French soldiers in Egypt, is a granodiorite stele inscribed with three scripts: Hieroglyphic, Demotic, and Ancient Greek. This trilingual decree allowed scholars like Champollion to decode Egyptian hieroglyphs by comparing them to the Greek text.",
+      idealPrompt: "Explain how the Rosetta Stone was discovered and used to decode hieroglyphs. Mention the three scripts, the year of discovery, and Champollion's contribution. Under 55 words.",
+      idealWaterMl: 12, idealCo2Grams: 0.121,
+    },
+  ]
 };
 
-/**
- * Returns a static fallback challenge for the given difficulty, rotating by
- * day-of-year so the same challenge doesn't appear on consecutive fallback days.
- */
-function getStaticFallbackChallenge(difficulty: string): object {
-  const key = difficulty.toUpperCase();
-  const pool = STATIC_FALLBACKS[key] ?? STATIC_FALLBACKS["BEGINNER"];
-  const dayOfYear = Math.floor(
-    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
-  );
-  return pool[dayOfYear % pool.length];
-}
+  // ─── fallback selector ─────────────────────────────────────────────────────
+  /**
+   * Returns a static fallback challenge for the given difficulty, rotating by
+   * day-of-year so the same challenge doesn't appear on consecutive fallback days.
+   * Properly stamps unique ID and sets both camelCase and snake_case properties.
+   */
+  function getStaticFallbackChallenge(difficulty: string): any {
+    const key = difficulty.toUpperCase();
+    const pool = STATIC_FALLBACKS[key] ?? STATIC_FALLBACKS["BEGINNER"];
+    const dayOfYear = Math.floor(
+      (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
+    );
+    const picked = pool[dayOfYear % pool.length] as any;
+    const todayStr = new Date().toISOString().split("T")[0];
+    
+    return {
+      ...picked,
+      id: `${picked.id}_${todayStr}`,
+      target_output: picked.targetOutput,
+      ideal_prompt: picked.idealPrompt,
+      ideal_water_ml: picked.idealWaterMl,
+      ideal_co2_grams: picked.idealCo2Grams,
+      char_count: picked.targetOutput.length,
+      charCount: picked.targetOutput.length,
+      active: true,
+    };
+  }
 
 /**
  * Generates an AI challenge and immediately validates its idealPrompt by
@@ -790,11 +907,11 @@ async function generateValidatedChallenge(difficulty: string): Promise<object> {
       continue; // generation itself failed → retry
     }
 
-    let validationScore = 0;
+    let validationResult;
     try {
-      validationScore = await validateIdealPrompt(candidate);
+      validationResult = await validateIdealPrompt(candidate);
       console.log(
-        `[Challenge] Attempt ${attempt}: idealPrompt scored ${validationScore}/100 ` +
+        `[Challenge] Attempt ${attempt}: idealPrompt scored ${validationResult.score}/100 ` +
         `(threshold: ${threshold})`
       );
     } catch (err) {
@@ -803,14 +920,21 @@ async function generateValidatedChallenge(difficulty: string): Promise<object> {
       continue;
     }
 
-    if (validationScore >= threshold) {
-      console.log(`[Challenge] Attempt ${attempt} accepted ✓ (score: ${validationScore})`);
-      return { ...candidate, validationScore };
+    if (validationResult.score >= threshold) {
+      console.log(`[Challenge] Attempt ${attempt} accepted ✓ (score: ${validationResult.score})`);
+      return {
+        ...candidate,
+        validationScore: validationResult.score,
+        idealWaterMl: validationResult.idealWaterMl,
+        ideal_water_ml: validationResult.idealWaterMl,
+        idealCo2Grams: validationResult.idealCo2Grams,
+        ideal_co2_grams: validationResult.idealCo2Grams,
+      };
     }
 
     console.warn(
       `[Challenge] Attempt ${attempt} rejected — ` +
-      `idealPrompt scored ${validationScore}/100 (need ${threshold}+). Discarding and retrying...`
+      `idealPrompt scored ${validationResult.score}/100 (need ${threshold}+). Discarding and retrying...`
     );
   }
 

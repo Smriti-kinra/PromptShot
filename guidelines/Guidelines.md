@@ -25,6 +25,8 @@ MUST READ before writing any code:
 
 Read on-demand:
 
+- [Methodology, Citations & Credibility](methodology.md) — scientific citations, scoring formulas, execution determinism
+- [Feature Catalog & Specifications](features.md) — game flow, scoring pipeline, results screen, eco stats, and leaderboard catalog
 - guidelines/components/{name}.md — read BEFORE building that component
 - guidelines/foundations/spacing.md — when placing any layout
 

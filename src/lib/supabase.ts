@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+export { projectId, publicAnonKey } from "../../utils/supabase/info";
 import { projectId, publicAnonKey } from "../../utils/supabase/info";
 import { safeStorage } from "./safeStorage";
 
@@ -18,6 +19,8 @@ export interface Challenge {
   difficulty: string;
   target_output: string;
   ideal_prompt?: string;
+  ideal_water_ml?: number;   // NEW
+  ideal_co2_grams?: number;  // NEW
   char_count: number;
   active: boolean;
   skill?: string;

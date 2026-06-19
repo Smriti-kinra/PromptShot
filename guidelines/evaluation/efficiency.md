@@ -6,13 +6,14 @@ The Brevity and Resource Footprints are evaluated mathematically on the server t
 
 ## 1. Score Dependency Scaling
 
-To prevent users from obtaining high scores for irrelevant, garbage, or short greeting-only prompts (e.g. formatting nonsense correctly, or submitting a tiny prompt that says nothing of substance), the final Format and Brevity scores scale with the Accuracy score.
+To prevent users from obtaining high scores for irrelevant, garbage, or short greeting-only prompts, the final Format and Brevity scores scale with the Accuracy score.
 
 $$\text{Accuracy Ratio} = \frac{\text{Accuracy}}{50}$$
-$$\text{Final Format} = \text{Math.round}(\text{Raw Format} \times \text{Accuracy Ratio})$$
-$$\text{Final Brevity} = \text{Math.round}(\text{Raw Brevity} \times \text{Accuracy Ratio})$$
+$$\text{Scaling Factor} = \max(0.4, \text{Accuracy Ratio})$$
+$$\text{Final Format} = \text{Math.round}(\text{Raw Format} \times \text{Scaling Factor})$$
+$$\text{Final Brevity} = \text{Math.round}(\text{Raw Brevity} \times \text{Scaling Factor})$$
 
-* **Zero Relevance**: If $\text{Accuracy} = 0$, then $\text{Final Format}$ and $\text{Final Brevity}$ are forced to $0$.
+* **Zero Relevance**: If $\text{Accuracy} = 0$, then the entire score is forced to $0$.
 
 ---
 
@@ -20,20 +21,16 @@ $$\text{Final Brevity} = \text{Math.round}(\text{Raw Brevity} \times \text{Accur
 
 Rewards players for drafting concise prompts compared to a benchmark "ideal prompt" length.
 
-* **Ideal Tokens Baseline**: Calculated as:
-  $$\text{Ideal Tokens} = \max(15, \text{Math.round}(\text{ideal\_prompt.length} / 4))$$
-* **Difficulty Ceiling Clamping**: The ideal baseline is clamped by a difficulty ceiling to prevent AI-generated challenges with highly variable ideal prompt lengths from distorting the score:
-  - **BEGINNER**: Ceiling of 40 tokens (~160 chars)
-  - **PRO**: Ceiling of 55 tokens (~220 chars)
-  - **EXPERT**: Ceiling of 70 tokens (~280 chars)
-  $$\text{Ideal Tokens Clamped} = \min(\text{Ceiling}, \text{Ideal Tokens})$$
-* **User Tokens**:
+* **Token Estimation**: Calculated as:
   $$\text{User Tokens} = \max(1, \text{Math.round}(\text{user\_prompt.length} / 4))$$
-* **Token Efficiency Formula (0–15 scale)**:
-  $$\text{Token Penalty} = \text{Math.round}\left(\frac{\max(0, \text{User Tokens} - \text{Ideal Tokens Clamped})}{3}\right)$$
-  $$\text{Token Efficiency} = \max(0, 15 - \text{Token Penalty})$$
-* **Raw Brevity Score (0-30 scale)**:
-  $$\text{Raw Brevity} = \min(30, \text{Token Efficiency} \times 2)$$
+  $$\text{Ideal Tokens} = \max(15, \text{Math.round}(\text{ideal\_prompt.length} / 4))$$
+* **Token Ratio**:
+  $$\text{Token Ratio} = \frac{\text{User Tokens}}{\text{Ideal Tokens}}$$
+* **Brevity Scoring Rules**:
+  - $\text{Token Ratio} \le 0.8$: **30 pts** (Meaningfully shorter / efficient)
+  - $0.8 < \text{Token Ratio} \le 1.0$: **24 to 30 pts** (linear scale: $30 - \frac{\text{Token Ratio} - 0.8}{0.2} \times 6$)
+  - $1.0 < \text{Token Ratio} \le 2.0$: **0 to 24 pts** (linear scale: $24 \times (1 - (\text{Token Ratio} - 1.0))$)
+  - $\text{Token Ratio} > 2.0$: **0 pts** (Twice as long as the ideal baseline)
 
 ---
 

@@ -12,8 +12,8 @@ PromptShot is structured as a React + TypeScript frontend and a Supabase backend
 graph TD
     User[User / Client UI] -->|1. Submit Prompt| App[App.tsx]
     App -->|2. HTTP POST /score| EdgeFunc[Supabase Edge Function /score]
-    EdgeFunc -->|3. Evaluate request| Claude[Claude Sandbox & Judge Agents]
-    Claude -->|4. Return scores| EdgeFunc
+    EdgeFunc -->|3. Evaluate request| Gemini[Gemini Sandbox & Judge Agents]
+    Gemini -->|4. Return scores| EdgeFunc
     EdgeFunc -->|5. Return JSON payload| App
     App -->|6. Save attempt| DB[(Supabase Database)]
     App -->|7. Animate & Render Results| User

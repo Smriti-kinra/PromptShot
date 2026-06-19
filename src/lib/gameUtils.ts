@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, publicAnonKey } from "./supabase";
 import type { Challenge } from "./supabase";
 import { DAILY_CHALLENGES } from "../data/challenges";
 
@@ -45,6 +45,8 @@ export function getLocalFallbackChallenge(difficulty: string): Challenge {
     difficulty: localCh.difficulty,
     target_output: localCh.targetOutput,
     ideal_prompt: localCh.idealPrompt,
+    ideal_water_ml: localCh.idealWaterMl,   // NEW
+    ideal_co2_grams: localCh.idealCo2Grams, // NEW
     char_count: localCh.charCount,
     active: true,
   };
@@ -55,8 +57,15 @@ export async function loadChallenge(
   selectFields: string
 ): Promise<Challenge | null> {
   try {
-    const url = `https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2/challenge?difficulty=${difficulty}`;
-    const res = await fetch(url);
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const BASE_URL = isLocal ? "http://localhost:8000/make-server-488928a2" : "https://fvtaoeunqeqnuotydrtv.supabase.co/functions/v1/make-server-488928a2";
+    const url = `${BASE_URL}/challenge?difficulty=${difficulty}`;
+    
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    headers["apikey"] = publicAnonKey;
+    headers["Authorization"] = `Bearer ${publicAnonKey}`;
+
+    const res = await fetch(url, { headers });
     if (!res.ok) throw new Error(`Challenge server returned ${res.status}`);
     const data = await res.json();
 
@@ -68,6 +77,8 @@ export async function loadChallenge(
       impactLesson: data.impactLesson || data.impact_lesson,
       target_output: data.targetOutput || data.target_output,
       ideal_prompt: data.idealPrompt || data.ideal_prompt,
+      ideal_water_ml: data.idealWaterMl ?? data.ideal_water_ml,   // NEW
+      ideal_co2_grams: data.idealCo2Grams ?? data.ideal_co2_grams, // NEW
       char_count: data.charCount || data.char_count,
       active: data.active,
     };
